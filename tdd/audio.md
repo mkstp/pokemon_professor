@@ -19,11 +19,20 @@ Module-level object mapping track ids to loaded `Audio` instances:
 
 ```js
 {
-  'overworld': Audio,   // HTMLAudioElement, looping
-  'battle': Audio,      // HTMLAudioElement, looping
-  'castle': Audio,      // HTMLAudioElement, looping
-  'victory': Audio,     // HTMLAudioElement, non-looping
-  'defeat': Audio,      // HTMLAudioElement, non-looping
+  'overworld': Audio,           // HTMLAudioElement, looping
+  'dungeon': Audio,             // HTMLAudioElement, looping
+  'indoor': Audio,              // HTMLAudioElement, looping
+  'cafeteria': Audio,           // HTMLAudioElement, looping
+  'castle': Audio,              // HTMLAudioElement, looping
+  'battle_schwaartz': Audio,    // HTMLAudioElement, looping
+  'battle_syntaxa': Audio,      // HTMLAudioElement, looping
+  'battle_composita': Audio,    // HTMLAudioElement, looping
+  'battle_recursio': Audio,     // HTMLAudioElement, looping
+  'battle_bayesio': Audio,      // HTMLAudioElement, looping
+  'battle_vec_tor': Audio,      // HTMLAudioElement, looping
+  'battle_parsemore': Audio,    // HTMLAudioElement, looping
+  'victory': Audio,             // HTMLAudioElement, non-looping
+  'defeat': Audio,              // HTMLAudioElement, non-looping
 }
 ```
 
@@ -81,4 +90,4 @@ Module-level string: the id of the track currently playing, or `null` if nothing
 - `data` — `audioTracks` array for track ids, file paths, and loop settings
 
 **Exposes to:**
-- `game` — `init()` on startup; `switchTo(trackId)` called on scene transitions (overworld ↔ battle, castle entry); `play('victory')` and `play('defeat')` called on battle resolution
+- `game` — `init()` on startup; `switchTo(trackId)` called on scene transitions; `play('victory')` and `play('defeat')` called on battle resolution. For battles, `game.js` calls `switchTo('battle_' + professorId)` using the professor's id field from `data.js`.
