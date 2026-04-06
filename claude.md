@@ -122,27 +122,16 @@ bd close <id>         # Complete work
 
 ## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, complete the following steps:
 
-**MANDATORY WORKFLOW:**
+1. **File issues for remaining work** — create Beads issues for anything needing follow-up
+2. **Run quality gates** (if code changed) — tests, linters, builds
+3. **Update issue status** — close finished work, update in-progress items
+4. **Sync tracker data** — run `bd dolt push` to push Beads issue data to remote
+5. **Hand off** — provide context for next session via EOS
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+**CRITICAL RULES — git push:**
+- **NEVER run `git push` during EOS or session close** — pushing to the GitHub repo is a separate, user-initiated process
+- Do NOT suggest, prompt, or offer to push — wait for the user to initiate it explicitly
+- `bd dolt push` (tracker data sync) is allowed; `git push` (code to GitHub) is not
 <!-- END BEADS INTEGRATION -->

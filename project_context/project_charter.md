@@ -4,6 +4,10 @@
 
 Build a browser-based, retro pixel-art RPG in which a student navigates a university campus and battles professors — each a caricature of their research field — to pass their classes. The game adapts the classic Pokemon formula to an academic setting, delivering a playable proof-of-concept with a complete core loop.
 
+## Portfolio Objective
+
+Demonstrate a disciplined, AI-assisted development methodology. The project serves as a portfolio artefact showing how design decisions are made, documented, and traced from concept through implementation. The design documents (GDD, TDD, session logs) are first-class deliverables — not byproducts — and together with the codebase tell the story of how the project was built. A `DESIGN.md` at the repository root explains the methodology and surfaces the process for portfolio reviewers.
+
 ## Project Purpose
 
 pokemon_professor is a standalone browser game built with HTML/CSS/JavaScript. The player controls a student character who roams a tile-based campus — including outdoor areas, building interiors, and hidden regions — and triggers turn-based battles with a fixed sequence of six professors. Each professor has scripted dialogue and a research-themed persona. Winning a battle passes the corresponding class; losing causes the player to faint and restart. The game features scene-appropriate background music and weather animations in the overworld.
@@ -14,7 +18,7 @@ pokemon_professor is a standalone browser game built with HTML/CSS/JavaScript. T
 - Tile-based campus map with multiple regions: outdoor campus, building interiors, and optional hidden areas
 - Overworld player movement and professor encounter triggers
 - Turn-based battle system faithful to classic Pokemon: moves, attacks, run option
-- Six professors in a fixed challenge sequence, each with a research-themed persona
+- Seven professors in a fixed challenge sequence, each with a research-themed persona
 - Dialogue system: scripted conversations between the player and professors before or after encounters
 - Win/lose states: pass class on victory, faint and restart on defeat
 - Background music with tracks that change by scene (overworld, battle, etc.)
@@ -70,5 +74,13 @@ pokemon_professor is a standalone browser game built with HTML/CSS/JavaScript. T
 **VC-09:** The player can transition between at least two distinct map regions (e.g. outdoor campus to a building interior) and return.
 - **Applies to:** Multi-region map system
 - **Check method:** Manual playthrough; confirm transition triggers fire, the new map loads correctly, and the player can return to the origin map
+
+**VC-10:** The castle is inaccessible until all five prior professors have been defeated; it becomes accessible immediately after the fifth defeat.
+- **Applies to:** Castle gate mechanic (map module)
+- **Check method:** Attempt to enter the castle with zero to four professors defeated — confirm the path is blocked. Defeat the fifth professor and confirm the path opens.
+
+**VC-11:** The repository contains a `DESIGN.md` that a reader unfamiliar with the project can use to understand the methodology, navigate the artefacts, and trace a design decision from concept to code.
+- **Applies to:** Portfolio documentation (DEL-004)
+- **Check method:** A reader with no prior project context reviews `DESIGN.md`; confirms they can identify the purpose of the GDD, TDD, and session logs, and can follow at least one decision from the change log through to the relevant code or design document.
 
 ---
