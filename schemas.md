@@ -9,3 +9,5 @@
 | Outstanding Issues (Beads) | `schemas/outstanding_issues.md` |
 | Background | `schemas/background.md` |
 | Deliverables | `schemas/deliverables.md` |
+| Technical Design Module (per-module TDD) | `schemas/technical_design_module.md` |
+| Game Design Document (GDD) | `schemas/game_design_document.md` |
