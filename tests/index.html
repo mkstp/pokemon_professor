@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tests — pokemon_professor</title>
+  <style>
+    body {
+      background: #0f0f1a;
+      color: #ccc;
+      margin: 0;
+    }
+    h1 {
+      font-family: monospace;
+      font-size: 16px;
+      color: #555;
+      padding: 24px 24px 0;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>pokemon_professor / tests</h1>
+
+  <script type="module">
+    // Import test files first — they register tests by calling test() at load time.
+    // Then call renderResults() to display the report.
+    import { renderResults } from './runner.js';
+    import './data.test.js';
+
+    renderResults();
+  </script>
+</body>
+</html>
