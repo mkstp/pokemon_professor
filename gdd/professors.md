@@ -8,7 +8,7 @@ Seven professors are defined. Six are used in a standard playthrough; Prof. Pars
 
 - **Department / Field:** Phonetics
 - **Personality:** Warm, unhurried, and acutely attuned to sound. Notices the acoustics of every space. Speaks in careful, rounded vowels and has a habit of pausing mid-sentence to listen to something nobody else hears. Not threatening — genuinely delighted to meet you. The introductory boss; the game's first handshake with the player.
-- **Visual design notes:** [placeholder] — soft colours, perhaps a cardigan. Holds a tuning fork or wears headphones around their neck.
+- **Visual design notes:** Woman. Warm sage cardigan over a cream shirt; warm greens and yellows. Very large, round, expressive ears — the first thing you notice. Carries a tuning fork. Stern expression that softens slightly at the eyes; the most approachable of the professors, but she means business.
 - **Location:** Outdoor campus — by the pond and its walkway.
 - **Pre-battle dialogue:**
   - "Ah — you've arrived. Listen to the pond for a moment. Do you hear the difference between that frog's call and the wind in the elms?"
@@ -29,7 +29,7 @@ Seven professors are defined. Six are used in a standard playthrough; Prof. Pars
 
 - **Department / Field:** Syntax
 - **Personality:** Precise, a little imperious, constitutionally unable to let an ill-formed sentence pass without comment. Not unkind — just very sure about what is and is not grammatical. Draws phrase structure trees on any available surface. Has strong opinions about the passive voice.
-- **Visual design notes:** [placeholder] — neat, formal. Probably chalk dust on their sleeve. Reading glasses pushed up on their forehead.
+- **Visual design notes:** Man. Dark blazer, white shirt, no tie. Extraordinarily bushy eyebrows — severe, almost architectural. Sharp jaw. Monocle. Upright posture, chin slightly raised. Expression: cool, evaluating, faintly disapproving. Palette: black, white, deep red accent.
 - **Location:** Classroom — main building, ground floor.
 - **Pre-battle dialogue:**
   - "Before we begin, I want to be clear: 'I could care less' is not idiomatic. It means the opposite of what you intend."
@@ -50,7 +50,7 @@ Seven professors are defined. Six are used in a standard playthrough; Prof. Pars
 
 - **Department / Field:** Semantics
 - **Personality:** Warm, digressive, and perpetually mid-thought. Asks "but what do you *mean* by that?" about everything — battle moves included. Not evasive; genuinely curious. Has a tendency to qualify every claim until it barely exists, then look pleased with the result. The most quotable professor.
-- **Visual design notes:** [placeholder] — slightly dishevelled, comfortable clothes. A mug that has gone cold. Bookmarked paperbacks visible somewhere.
+- **Visual design notes:** Woman. Several layered cardigans in earthy tones. Voluminous, genuinely unkempt warm-toned hair. A very broad, prominent nose — warm and characterful. Ink on her hands. Expression: thoughtful, slightly distracted, but with an underlying intensity. Mugs at various stages of cold visible around her.
 - **Location:** Library — mezzanine level.
 - **Pre-battle dialogue:**
   - "Oh, you're here to battle? Interesting. What do you mean by 'battle,' exactly?"
@@ -71,7 +71,7 @@ Seven professors are defined. Six are used in a standard playthrough; Prof. Pars
 
 - **Department / Field:** Data Structures & Algorithms
 - **Personality:** Enthusiastic, fast-talking, runs on coffee. Frames every problem as a search over a state space and is visibly excited when the framing works. Genuinely kind but moves very fast — it takes a moment to catch up. The whiteboard behind them is always full.
-- **Visual design notes:** [placeholder] — casual, possibly a hoodie. Dry-erase marker in hand. Multiple coffee cups at various stages of emptiness.
+- **Visual design notes:** Man. Navy hoodie with dry-erase marker scrawls on the sleeves and cuffs — runs out of whiteboard regularly. Unusually large, wide-set eyes that give him a permanently alert look. Lean build, perpetually leaning forward. Expression: energised, intense. Vivid palette: electric blue and lime accents. Coffee cups in the background.
 - **Location:** PhD student dungeon — basement of the main building.
 - **Pre-battle dialogue:**
   - "Oh good, you found the dungeon! Most people can't. It's basically a graph traversal problem — you just have to know which edges exist."
@@ -92,7 +92,7 @@ Seven professors are defined. Six are used in a standard playthrough; Prof. Pars
 
 - **Department / Field:** NLP / Deep Learning
 - **Personality:** Brilliant, friendly, and running on approximately four hours of sleep. Speaks fluently in training metrics and loss curves. Has strong opinions about tokenisation schemes and will share them unprompted. Lives in the GPU lab; unclear if they go home. Not intimidating — just operating at a slightly different frequency than everyone else.
-- **Visual design notes:** [placeholder] — tired eyes, comfortable clothes, probably a university hoodie. Terminal window visible on a monitor behind them. The room is loud with fans.
+- **Visual design notes:** Woman. Zip-up fleece over a long-sleeve shirt. Realistically heavy dark circles — genuinely exhausted. A pronounced, strong brow ridge that makes her expression naturally severe. Mismatched socks, just visible. Expression: focused, slightly hollowed. Blue-shifted lighting from the terminal behind her; GPU fans visible in the background.
 - **Location:** GPU lab — lab wing, upper floor.
 - **Pre-battle dialogue:**
   - "Hey! Sorry — one sec — okay, the training run is stable. What's up?"
@@ -113,7 +113,7 @@ Seven professors are defined. Six are used in a standard playthrough; Prof. Pars
 
 - **Department / Field:** Computational Semantics
 - **Personality:** Formal, precise, and quietly delighted when a proof goes through. Synthesises everything that came before — the structure of Syntax, the meaning of Semantics, the machinery of DSA and NLP — into a unified formal framework. Not cold: there is warmth beneath the formalism, revealed gradually. The hardest professor is also, in some ways, the most honest about what they love.
-- **Visual design notes:** [placeholder] — composed, perhaps older than the others. Stone walls visible behind them. The castle setting suits them — they feel like they belong in a place with that kind of weight.
+- **Visual design notes:** Man. The oldest of the professors. Long, well-cut dark coat. Tall and lean. Very prominent, patrician nose — long and straight. Defined cheekbones. Expression: composed, utterly still, calibrated — not threatening, just certain. Near-monochromatic palette with one cold accent. Castle stone wall visible behind him.
 - **Location:** The castle — top of the hill, final encounter.
 - **Pre-battle dialogue:**
   - "You've come a long way. Phonetics, Syntax, Semantics, Algorithms, Deep Learning — you've heard their arguments."
@@ -135,7 +135,7 @@ Seven professors are defined. Six are used in a standard playthrough; Prof. Pars
 - **Department / Field:** Computational Linguistics / Corpus Analysis
 - **Status:** Reserve professor. Not in the current campus map. Can substitute for Prof. Recursio (position 4) without other changes to game structure.
 - **Personality:** Empirical to the bone. Doesn't trust theory that can't be grounded in data. Maintains a corpus of 400 million tokens on a personal hard drive and refers to it during arguments. Methodical in conversation — listens fully before responding, then produces evidence. Slightly amused by people who argue from intuition alone.
-- **Visual design notes:** [placeholder] — patient expression, laptop always open. A second monitor showing a concordance. Surrounded by annotated printouts.
+- **Visual design notes:** Woman. Practical trousers and collared shirt, stray annotation marks from working. Very square jaw; a patient, grounded face. Thick-framed glasses with one arm repaired with tape. Expression: measured, faintly amused. Papers and a second monitor visible around her.
 - **Location:** Graduate lounge or corpus annotation lab — to be determined if activated.
 - **Pre-battle dialogue:**
   - "You want to argue about language? Good. I have 400 million tokens that say you're wrong."

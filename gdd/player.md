@@ -5,7 +5,7 @@
 ## Player Character
 
 **Name:** Unnamed student.
-**Description:** A graduate student, newly arrived. Appearance is defined by the player's imagination; no sprite details are prescribed. Carries a laptop bag.
+**Description:** A graduate student, newly arrived. Appearance is defined by the player's imagination; no sprite details are prescribed. Carries a bright orange backpack.
 **Stats:**
 - HP: 100
 - Attack: derived from move selection (no separate stat)
