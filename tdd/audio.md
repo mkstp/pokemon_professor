@@ -24,13 +24,13 @@ Module-level object mapping track ids to Phaser `BaseSound` instances:
   'indoor':            BaseSound,  // looping
   'cafeteria':         BaseSound,  // looping
   'castle':            BaseSound,  // looping
-  'battle_schwaartz':  BaseSound,  // looping
-  'battle_syntaxa':    BaseSound,  // looping
-  'battle_composita':  BaseSound,  // looping
-  'battle_recursio':   BaseSound,  // looping
-  'battle_bayesio':    BaseSound,  // looping
-  'battle_vec_tor':    BaseSound,  // looping
-  'battle_parsemore':  BaseSound,  // looping
+  'battle_prof_schwaartz':  BaseSound,  // looping
+  'battle_prof_syntaxa':    BaseSound,  // looping
+  'battle_prof_composita':  BaseSound,  // looping
+  'battle_prof_recursio':   BaseSound,  // looping
+  'battle_prof_bayesio':    BaseSound,  // looping
+  'battle_prof_vec_tor':    BaseSound,  // looping
+  'battle_prof_parsemore':  BaseSound,  // looping
   'victory':           BaseSound,  // non-looping
   'defeat':            BaseSound,  // non-looping
 }
