@@ -1,0 +1,29 @@
+// main.js — Phaser game entry point
+//
+// Creates the Phaser.Game instance and registers all scenes. No game logic
+// lives here — all behaviour is in the scene files.
+
+import OverworldScene from './scenes/OverworldScene.js';
+import BattleScene    from './scenes/BattleScene.js';
+import DialogueScene  from './scenes/DialogueScene.js';
+import AudioScene     from './scenes/AudioScene.js';
+
+const config = {
+  type:            Phaser.AUTO,   // WebGL if available, Canvas fallback
+  width:           480,
+  height:          320,
+  backgroundColor: '#000000',
+  scene: [
+    // OverworldScene auto-starts first; it launches AudioScene and other scenes.
+    OverworldScene,
+    BattleScene,
+    DialogueScene,
+    AudioScene,
+  ],
+  physics: {
+    default: 'arcade',
+    arcade:  { gravity: { y: 0 }, debug: false },
+  },
+};
+
+new Phaser.Game(config);

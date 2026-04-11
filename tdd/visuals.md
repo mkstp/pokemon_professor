@@ -18,7 +18,7 @@ The game uses two distinct sprite tiers, consistent with the Pokemon source mate
 
 | Tier | Context | Visual role | Resolution | Production method |
 |------|---------|-------------|------------|-------------------|
-| Battle sprites | Battle scene | Detailed character portraits; the primary visual during combat | 96×96 px | AI-generated (Midjourney) → cleaned up in Aseprite |
+| Battle sprites | Battle scene | Detailed character portraits; the primary visual during combat | 192×192 px | AI-generated (Midjourney) → cleaned up in Aseprite |
 | Overworld sprites | Overworld map | Small top-down figures conveying silhouette and colour; not portraits | 32×32 px | Hand-drawn in Aseprite |
 
 These tiers are independent. A battle sprite and an overworld sprite for the same character do not need to match in detail — they need to share dominant colour and be recognisable as the same character at their respective scales.
@@ -71,7 +71,7 @@ Each cell is 32×32 px.
 
 ### Battle sprites
 
-Single PNG per character, 96×96 px. No sprite sheet — one file per sprite.
+Single PNG per character, 192×192 px. No sprite sheet — one file per sprite.
 
 ---
 
@@ -146,21 +146,21 @@ Sprite paths in `data.js` (`professor.sprites.battle`, `professor.sprites.overwo
 
 1. Generate Prof. Schwaartz first using her visual design brief as the prompt, with pixel art style directives.
 2. Use the Schwaartz output as a style reference (`--sref`) for all subsequent professor generations. This enforces visual consistency across the roster.
-3. Import each generated image into Aseprite. Resize canvas to 96×96 if needed. Clean up edges and reduce the palette to a retro-appropriate range (16–32 colours per sprite).
+3. Import each generated image into Aseprite. Resize canvas to 192×192 if needed. Clean up edges and reduce the palette to a retro-appropriate range (16–32 colours per sprite).
 4. Export as PNG to `assets/sprites/battle/`.
 
 ### Overworld sprites (Aseprite, hand-drawn)
 
-1. Work at 24×24 px per frame. At this resolution, the goal is silhouette and dominant colour — not portrait likeness.
+1. Work at 32×32 px per frame. At this resolution, the goal is silhouette and dominant colour — not portrait likeness.
 2. Reference each professor's battle sprite for colour palette only.
-3. Draw two idle frames per professor; assemble into the 48×24 sprite sheet format.
-4. Draw the player walk cycle (12 frames) in the 72×96 sheet format.
+3. Draw two idle frames per professor; assemble into the 64×32 sprite sheet format.
+4. Draw the player walk cycle (12 frames) in the 96×128 sheet format.
 5. Export as PNG to `assets/sprites/overworld/`.
 
 ---
 
 ## Constraints
 
-- All sprites must use a consistent pixel density — do not mix 96×96 and 128×128 battle sprites.
-- Overworld sprites must all use the same 24×24 cell size so the map renderer can draw them without per-character configuration.
+- All sprites must use a consistent pixel density — do not mix 192×192 and other sizes for battle sprites.
+- Overworld sprites must all use the same 32×32 cell size so the map renderer can draw them without per-character configuration.
 - No sprite should require transparency in unexpected places — use a consistent background colour (e.g. magenta `#FF00FF`) as a chroma key if needed, or export with a clean alpha channel.
