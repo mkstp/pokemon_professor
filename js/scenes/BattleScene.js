@@ -52,8 +52,12 @@ const MOVE_STEP   =  26; // pixels between each move row
 const LOG_X = 14;
 const LOG_Y = UI_PANEL_Y + 10;
 
-// Milliseconds to display the battle log before returning to move selection.
-const LOG_DISPLAY_MS = 1800;
+// Milliseconds to display a battle log line before advancing to the next step.
+const LINE_DISPLAY_MS = 1200;
+// Duration of an HP bar drain animation (ms).
+const HP_ANIM_MS = 800;
+// Brief pause after an HP animation completes before the next step begins (ms).
+const HP_POST_PAUSE = 400;
 
 // Lookup map: professor move id → move object.
 // Built once at module load so resolveTurn() doesn't scan the array each call.
@@ -73,10 +77,22 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // Loads battle sprites. Skips the load if Phaser already cached the texture.
+  // Professors with a sprites[] array get each level loaded under the key
+  // '<professorId>_l1', '<professorId>_l2', etc. Single-image professors use
+  // the professorId key directly.
   preload() {
     const prof = professors.find(p => p.id === this.professorId);
-    if (!this.textures.exists(this.professorId)) {
-      this.load.image(this.professorId, prof.sprite);
+    if (prof.sprites) {
+      prof.sprites.forEach((path, i) => {
+        const key = `${this.professorId}_l${i + 1}`;
+        if (!this.textures.exists(key)) {
+          this.load.image(key, path);
+        }
+      });
+    } else {
+      if (!this.textures.exists(this.professorId)) {
+        this.load.image(this.professorId, prof.sprite);
+      }
     }
     if (!this.textures.exists('player_battle')) {
       this.load.image('player_battle', 'assets/sprites/battle/player.png');
@@ -99,7 +115,6 @@ export default class BattleScene extends Phaser.Scene {
       playerMoves:         playerMoves,
       selectedMoveIndex:   0,
       phase:               'select', // 'select' | 'resolve' | 'animating' | 'end' | 'done'
-      lastActionText:      '',
       outcome:             null,     // null | 'win' | 'loss' | 'fled'
       disrupted:           false,    // true → player's next move deals half damage
       professorSkipped:    false,    // true → professor skips their next turn
@@ -109,14 +124,17 @@ export default class BattleScene extends Phaser.Scene {
     };
 
     // --- Background ---
-    this.add.rectangle(240, 160, 480, 320, 0x1e1e2e);
+    this.add.rectangle(240, 160, 480, 320, 0xffffff);
     // UI panel
-    this.add.rectangle(240, UI_PANEL_Y + UI_PANEL_H / 2, 480, UI_PANEL_H, 0x2a2a4a);
+    this.add.rectangle(240, UI_PANEL_Y + UI_PANEL_H / 2, 480, UI_PANEL_H, 0xf0f0f0);
     // Panel border
-    this.add.rectangle(240, UI_PANEL_Y, 480, 2, 0x5555aa);
+    this.add.rectangle(240, UI_PANEL_Y, 480, 2, 0x888888);
 
     // --- Battle sprites ---
-    this.add.image(PROF_SPRITE_X, PROF_SPRITE_Y, this.professorId)
+    // Initial texture: l1 (full-HP level) for multi-level professors, or the
+    // single sprite key for professors without a sprites[] array.
+    const initialTexture = prof.sprites ? `${this.professorId}_l1` : this.professorId;
+    this.professorSprite = this.add.image(PROF_SPRITE_X, PROF_SPRITE_Y, initialTexture)
       .setScale(PROF_SPRITE_SCALE)
       .setOrigin(0.5);
 
@@ -130,28 +148,28 @@ export default class BattleScene extends Phaser.Scene {
 
     // --- Name / HP labels ---
     this.add.text(PROF_HP_LABEL_X, PROF_HP_LABEL_Y, prof.name, {
-      fontSize: '11px', fill: '#ffffff', fontFamily: 'monospace',
+      fontSize: '11px', fill: '#222222', fontFamily: 'monospace',
     });
 
     this.add.text(PLAYER_HP_LABEL_X, PLAYER_HP_LABEL_Y, 'You', {
-      fontSize: '11px', fill: '#ffffff', fontFamily: 'monospace',
+      fontSize: '11px', fill: '#222222', fontFamily: 'monospace',
     });
 
     // Numeric HP counter shown next to the player HP bar.
     this.playerHPText = this.add.text(PLAYER_HP_NUM_X, PLAYER_HP_BAR_Y - 2, '', {
-      fontSize: '10px', fill: '#aaffaa', fontFamily: 'monospace',
+      fontSize: '10px', fill: '#226622', fontFamily: 'monospace',
     });
 
     // --- Move menu: four Text objects, one per player move ---
     this.moveTexts = playerMoves.map((_, i) =>
       this.add.text(MOVE_X, MOVE_Y_BASE + i * MOVE_STEP, '', {
-        fontSize: '13px', fill: '#ddddff', fontFamily: 'monospace',
+        fontSize: '13px', fill: '#222266', fontFamily: 'monospace',
       })
     );
 
     // --- Battle log: replaces the move menu during turn resolution ---
     this.battleLogText = this.add.text(LOG_X, LOG_Y, '', {
-      fontSize: '13px', fill: '#ffffcc', fontFamily: 'monospace',
+      fontSize: '13px', fill: '#443300', fontFamily: 'monospace',
       wordWrap: { width: 450 },
     }).setVisible(false);
 
@@ -199,7 +217,19 @@ export default class BattleScene extends Phaser.Scene {
     this.renderMoveMenu();
 
     // --- Start battle music ---
-    this.scene.get('AudioScene').switchTo('battle_' + this.professorId);
+    // Browsers block audio until a user gesture has occurred (autoplay policy).
+    // AudioScene is also loaded in parallel and may not have finished populating
+    // this.tracks yet. Deferring until the 'unlocked' event solves both: by the
+    // time the player presses any key, the audio context is open and AudioScene
+    // is guaranteed to be ready.
+    const trackId = 'battle_' + this.professorId;
+    if (this.sound.locked) {
+      this.sound.once('unlocked', () => {
+        this.scene.get('AudioScene').switchTo(trackId);
+      });
+    } else {
+      this.scene.get('AudioScene').switchTo(trackId);
+    }
   }
 
   // Called every frame by Phaser. Only acts on phase transitions.
@@ -225,23 +255,38 @@ export default class BattleScene extends Phaser.Scene {
   // Applies the full turn: player move → professor move. Checks win/loss after
   // each step. Sets phase to 'animating' on entry to prevent re-entry from
   // update() while the scene waits to return to 'select'.
+  //
+  // Rather than resolving everything then printing a flat list, this builds a
+  // seq[] of visual steps — text lines and HP bar animations — that are played
+  // back in order by _runSequence(). HP values are captured before each change
+  // so the tween knows the correct from/to range.
+  //
+  // Note: engine.setPlayerHP(n) resets to 100 when n ≤ 0 (faint/respawn).
+  // Loss conditions are therefore checked against the raw pre-clamp value, not
+  // the post-call engine state.
   resolveTurn() {
     this.battleState.phase = 'animating'; // prevent re-entry
 
-    const bs    = this.battleState;
-    const move  = bs.playerMoves[bs.selectedMoveIndex];
-    const lines = []; // log lines accumulated during this turn
+    const bs   = this.battleState;
+    const move = bs.playerMoves[bs.selectedMoveIndex];
+    const seq  = []; // ordered visual steps: text lines and HP animations
+
+    const text   = msg     => seq.push(next => this._showLine(msg, next));
+    const animP  = (f, t)  => seq.push(next => this._animateProfHP(f, t, next));
+    const animPl = (f, t)  => seq.push(next => this._animatePlayerHP(f, t, next));
 
     // 1. Apply any deferred professor damage from the previous turn.
     if (bs.deferredDamage > 0) {
-      const deferred = bs.deferredDamage;
+      const dmg  = bs.deferredDamage;
       bs.deferredDamage = 0;
-      engine.setPlayerHP(engine.getState().playerHP - deferred);
-      bs.lastProfessorDamage = deferred;
-      lines.push(`The deferred effect hits! You take ${deferred} damage.`);
-
-      if (engine.getState().playerHP <= 0) {
-        return this._endTurn(lines, 'loss');
+      const fromHP = engine.getState().playerHP;
+      const toHP   = fromHP - dmg;
+      engine.setPlayerHP(toHP);
+      bs.lastProfessorDamage = dmg;
+      text(`The deferred effect hits! You take ${dmg} damage.`);
+      animPl(fromHP, Math.max(0, toHP));
+      if (toHP <= 0) {
+        return this._endSeq(seq, 'loss');
       }
     }
 
@@ -258,26 +303,36 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     // 3. Apply player damage to professor.
-    bs.professorHP = Math.max(0, bs.professorHP - playerDamage);
-    lines.push(`You use ${move.name}! Deals ${playerDamage} damage.`);
+    const fromProfHP = bs.professorHP;
+    bs.professorHP   = Math.max(0, bs.professorHP - playerDamage);
+    text(`You use ${move.name}! Deals ${playerDamage} damage.`);
+    animP(fromProfHP, bs.professorHP);
 
     // 4. Apply player move effects.
     switch (move.effect) {
       case 'skip':
         bs.professorSkipped = true;
-        lines.push(`${bs.professor.name} is stunned — skips their next turn.`);
+        text(`${bs.professor.name} is stunned — skips their next turn.`);
         break;
-      case 'player_recoil':
-        engine.setPlayerHP(engine.getState().playerHP - 10);
-        lines.push('You take 10 recoil damage.');
+      case 'player_recoil': {
+        const from  = engine.getState().playerHP;
+        const newHP = from - 10;
+        engine.setPlayerHP(newHP);
+        text('You take 10 recoil damage.');
+        animPl(from, Math.max(0, newHP));
+        if (newHP <= 0) {
+          text('You fainted from recoil!');
+          return this._endSeq(seq, 'loss');
+        }
         break;
+      }
       case 'clear_debuff':
         bs.disrupted = false;
-        lines.push('Disruption effect cleared!');
+        text('Disruption effect cleared!');
         break;
       case 'halve_next':
         bs.professorHalved = true;
-        lines.push(`${bs.professor.name}'s next move will deal half damage.`);
+        text(`${bs.professor.name}'s next move will deal half damage.`);
         break;
       // 'counter' and null require no additional action here.
     }
@@ -285,76 +340,70 @@ export default class BattleScene extends Phaser.Scene {
     // 5. Check win condition (professor HP depleted).
     if (bs.professorHP <= 0) {
       engine.defeatProfessor(this.professorId);
-      lines.push(`${bs.professor.name} is defeated! Class passed!`);
-      return this._endTurn(lines, 'win');
+      text(`${bs.professor.name} is defeated! Class passed!`);
+      return this._endSeq(seq, 'win');
     }
 
-    // 6. Check if player recoil knocked player out.
-    if (engine.getState().playerHP <= 0) {
-      lines.push('You fainted from recoil!');
-      return this._endTurn(lines, 'loss');
-    }
-
-    // 7. Professor's turn.
+    // 6. Professor's turn.
     if (bs.professorSkipped) {
       bs.professorSkipped = false;
-      lines.push(`${bs.professor.name} is stunned and does nothing.`);
+      text(`${bs.professor.name} is stunned and does nothing.`);
     } else {
       const moveIds    = bs.professor.moves;
       const profMoveId = moveIds[Math.floor(Math.random() * moveIds.length)];
       const profMove   = PROF_MOVE_MAP[profMoveId];
 
       if (profMove.effect === 'deferred') {
-        // Store damage; it will be applied at the start of the next professor turn.
-        bs.deferredDamage    = profMove.damage;
+        // Store damage; it will be applied at the start of the next turn.
+        bs.deferredDamage      = profMove.damage;
         bs.lastProfessorDamage = 0;
-        lines.push(`${bs.professor.name} uses ${profMove.name}. The effect is delayed...`);
+        text(`${bs.professor.name} uses ${profMove.name}. The effect is delayed...`);
       } else {
         let profDamage = profMove.damage;
 
         // 'halve_next': this professor move deals half damage; flag resets.
         if (bs.professorHalved) {
-          profDamage = Math.floor(profDamage / 2);
+          profDamage         = Math.floor(profDamage / 2);
           bs.professorHalved = false;
-          lines.push(`${bs.professor.name}'s move is weakened!`);
+          text(`${bs.professor.name}'s move is weakened!`);
         }
 
-        engine.setPlayerHP(engine.getState().playerHP - profDamage);
-        bs.lastProfessorDamage = profDamage;
-        lines.push(`${bs.professor.name} uses ${profMove.name}! Deals ${profDamage} damage.`);
+        text(`${bs.professor.name} uses ${profMove.name}! Deals ${profDamage} damage.`);
 
-        // Apply professor move effects.
+        // Apply player damage and animate the player HP bar.
+        const fromPHP = engine.getState().playerHP;
+        const toPHP   = fromPHP - profDamage;
+        engine.setPlayerHP(toPHP);
+        bs.lastProfessorDamage = profDamage;
+        animPl(fromPHP, Math.max(0, toPHP));
+
         if (profMove.effect === 'disrupt') {
           bs.disrupted = true;
-          lines.push('Your next move will deal half damage!');
+          text('Your next move will deal half damage!');
         } else if (profMove.effect === 'self_damage') {
-          const recoil = Math.floor(profMove.damage * 0.25);
-          bs.professorHP = Math.max(0, bs.professorHP - recoil);
-          lines.push(`${bs.professor.name} takes ${recoil} recoil damage.`);
+          // Professor also takes 25 % recoil.
+          const recoil       = Math.floor(profMove.damage * 0.25);
+          const fromProfHP2  = bs.professorHP;
+          bs.professorHP     = Math.max(0, bs.professorHP - recoil);
+          text(`${bs.professor.name} takes ${recoil} recoil damage.`);
+          animP(fromProfHP2, bs.professorHP);
 
-          // Check if self-damage knocked the professor out.
           if (bs.professorHP <= 0) {
             engine.defeatProfessor(this.professorId);
-            lines.push(`${bs.professor.name} faints from recoil! Class passed!`);
-            return this._endTurn(lines, 'win');
+            text(`${bs.professor.name} faints from recoil! Class passed!`);
+            return this._endSeq(seq, 'win');
           }
         }
 
-        // Check if professor's move knocked player out.
-        if (engine.getState().playerHP <= 0) {
-          lines.push('You fainted!');
-          return this._endTurn(lines, 'loss');
+        if (toPHP <= 0) {
+          text('You fainted!');
+          return this._endSeq(seq, 'loss');
         }
       }
     }
 
-    // 8. Turn complete — display log, then return to move selection.
-    bs.lastActionText = lines.join('\n');
-    this.drawHPBars();
-    this.battleLogText.setText(bs.lastActionText);
-
-    this.time.delayedCall(LOG_DISPLAY_MS, () => {
-      if (bs.outcome !== null) return; // battle ended during display delay
+    // 7. Turn complete — run the visual sequence, then return to move selection.
+    this._runSequence(seq, () => {
       bs.phase = 'select';
       this.battleLogText.setVisible(false);
       this.moveTexts.forEach(t => t.setVisible(true));
@@ -395,29 +444,35 @@ export default class BattleScene extends Phaser.Scene {
 
   // ─── Render helpers ───────────────────────────────────────────────────────
 
-  // Redraws both HP bars and the player HP number using current state.
+  // Redraws both HP bars at the current engine/battleState values.
+  // Called once on scene creation; individual bars are updated via the
+  // _drawProfHPBar / _drawPlayerHPBar helpers during animations.
   drawHPBars() {
-    const playerHP  = engine.getState().playerHP;
+    this._drawProfHPBar(this.battleState.professorHP);
+    this._drawPlayerHPBar(engine.getState().playerHP);
+  }
+
+  // Redraws the professor HP bar at the given hp value and updates the sprite.
+  _drawProfHPBar(hp) {
     const profMaxHP = this.battleState.professor.hp;
-    const profHP    = this.battleState.professorHP;
-
-    // Professor HP bar
+    const ratio     = Math.max(0, hp / profMaxHP);
     this.profHPBar.clear();
-    this.profHPBar.fillStyle(0x333355);
+    this.profHPBar.fillStyle(0xcccccc);
     this.profHPBar.fillRect(PROF_HP_BAR_X, PROF_HP_BAR_Y, HP_BAR_W, HP_BAR_H);
-    const profRatio = Math.max(0, profHP / profMaxHP);
-    this.profHPBar.fillStyle(this._hpColour(profRatio));
-    this.profHPBar.fillRect(PROF_HP_BAR_X, PROF_HP_BAR_Y, Math.floor(HP_BAR_W * profRatio), HP_BAR_H);
+    this.profHPBar.fillStyle(this._hpColour(ratio));
+    this.profHPBar.fillRect(PROF_HP_BAR_X, PROF_HP_BAR_Y, Math.floor(HP_BAR_W * ratio), HP_BAR_H);
+    this._updateProfSprite(ratio);
+  }
 
-    // Player HP bar
+  // Redraws the player HP bar and numeric counter at the given hp value.
+  _drawPlayerHPBar(hp) {
+    const ratio = Math.max(0, hp / 100);
     this.playerHPBar.clear();
-    this.playerHPBar.fillStyle(0x333355);
+    this.playerHPBar.fillStyle(0xcccccc);
     this.playerHPBar.fillRect(PLAYER_HP_BAR_X, PLAYER_HP_BAR_Y, HP_BAR_W, HP_BAR_H);
-    const playerRatio = Math.max(0, playerHP / 100);
-    this.playerHPBar.fillStyle(this._hpColour(playerRatio));
-    this.playerHPBar.fillRect(PLAYER_HP_BAR_X, PLAYER_HP_BAR_Y, Math.floor(HP_BAR_W * playerRatio), HP_BAR_H);
-
-    this.playerHPText.setText(`${playerHP}/100`);
+    this.playerHPBar.fillStyle(this._hpColour(ratio));
+    this.playerHPBar.fillRect(PLAYER_HP_BAR_X, PLAYER_HP_BAR_Y, Math.floor(HP_BAR_W * ratio), HP_BAR_H);
+    this.playerHPText.setText(`${Math.max(0, Math.round(hp))}/100`);
   }
 
   // Updates the four move Text objects to reflect the current selection.
@@ -430,6 +485,22 @@ export default class BattleScene extends Phaser.Scene {
 
   // ─── Private helpers ──────────────────────────────────────────────────────
 
+  // Swaps the professor sprite texture based on remaining HP ratio.
+  // Only acts on professors that have a sprites[] array in data.js.
+  //   ratio > 0.66 → level 1 (calm)
+  //   ratio > 0.33 → level 2
+  //   ratio ≤ 0.33 → level 3 (most energised)
+  _updateProfSprite(ratio) {
+    const prof = this.battleState.professor;
+    if (!prof.sprites) return;
+
+    const level = ratio > 0.66 ? 1 : ratio > 0.33 ? 2 : 3;
+    const key   = `${this.professorId}_l${level}`;
+    if (this.professorSprite.texture.key !== key) {
+      this.professorSprite.setTexture(key);
+    }
+  }
+
   // Returns a colour integer for an HP bar based on the HP ratio.
   //   > 50 % → green, > 25 % → yellow, ≤ 25 % → red
   _hpColour(ratio) {
@@ -438,17 +509,52 @@ export default class BattleScene extends Phaser.Scene {
     return 0xff4444;
   }
 
-  // Finalises a turn with a win, loss, or (implicitly) other outcome.
-  // Updates the log, redraws HP bars, then queues endBattle().
-  _endTurn(lines, outcome) {
-    const bs = this.battleState;
-    bs.outcome        = outcome;
-    bs.lastActionText = lines.join('\n');
-    this.drawHPBars();
-    this.battleLogText.setText(bs.lastActionText);
-    // Delay briefly so the player can read the final log line before exit.
-    this.time.delayedCall(LOG_DISPLAY_MS, () => {
-      bs.phase = 'end';
+  // Runs an array of step functions in order. Each step receives a `next`
+  // callback it must call when it is done (e.g. after a delay or tween).
+  _runSequence(steps, onDone) {
+    let i = 0;
+    const next = () => {
+      if (i >= steps.length) { onDone(); return; }
+      steps[i++](next);
+    };
+    next();
+  }
+
+  // Visual step: display a single log line and wait LINE_DISPLAY_MS before next.
+  _showLine(msg, next) {
+    this.battleLogText.setText(msg);
+    this.time.delayedCall(LINE_DISPLAY_MS, next);
+  }
+
+  // Visual step: tween the professor HP bar from `from` to `to` over HP_ANIM_MS,
+  // then pause HP_POST_PAUSE before calling next.
+  _animateProfHP(from, to, next) {
+    this.tweens.addCounter({
+      from, to,
+      duration:   HP_ANIM_MS,
+      ease:       'Linear',
+      onUpdate:   tween => this._drawProfHPBar(tween.getValue()),
+      onComplete: () => this.time.delayedCall(HP_POST_PAUSE, next),
     });
+  }
+
+  // Visual step: tween the player HP bar from `from` to `to` over HP_ANIM_MS,
+  // then pause HP_POST_PAUSE before calling next.
+  _animatePlayerHP(from, to, next) {
+    this.tweens.addCounter({
+      from, to,
+      duration:   HP_ANIM_MS,
+      ease:       'Linear',
+      onUpdate:   tween => this._drawPlayerHPBar(tween.getValue()),
+      onComplete: () => this.time.delayedCall(HP_POST_PAUSE, next),
+    });
+  }
+
+  // Finalises a turn with a win or loss outcome: sets bs.outcome, runs the
+  // accumulated visual sequence, then sets phase to 'end' to trigger endBattle().
+  _endSeq(seq, outcome) {
+    const bs   = this.battleState;
+    bs.outcome = outcome;
+    this._runSequence(seq, () => { bs.phase = 'end'; });
   }
 }

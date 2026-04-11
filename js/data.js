@@ -277,6 +277,9 @@ export const playerMoves = [
 // battleMusic: audioTrack id to play during this professor's battle.
 //   Convention: 'battle_<professorId>'.
 // sprite: path to the battle sprite image (assets/sprites/battle/).
+//   For professors with multi-level art, sprites[] overrides sprite: it lists three
+//   paths in ascending energy order (l1 = full HP, l3 = low HP / most energised).
+//   sprite is still required as a Phaser preload fallback for single-image professors.
 //   TODO: bayesio and vec_tor sprites not yet created — placeholder paths used.
 
 export const professors = [
@@ -295,7 +298,12 @@ export const professors = [
       postWin:   'prof_schwaartz_win',
       postLoss:  'prof_schwaartz_loss',
     },
-    sprite:      'assets/sprites/battle/schwaartz.png',
+    sprite:      'assets/sprites/battle/schwaartz_l1.png',
+    sprites:     [
+      'assets/sprites/battle/schwaartz_l1.png',   // > 66 % HP
+      'assets/sprites/battle/schwaartz_l2.png',   // 34 – 66 % HP
+      'assets/sprites/battle/schwaartz_l3.png',   // ≤ 33 % HP  (most energised)
+    ],
     battleMusic: 'battle_prof_schwaartz',
   },
   {

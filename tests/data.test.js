@@ -420,3 +420,49 @@ test('professors are ordered by increasing HP (encounter sequence)', () => {
     );
   }
 });
+
+// ─── PROFESSOR SPRITES — multi-level ─────────────────────────────────────────
+
+test('professors with sprites[] have exactly 3 entries', () => {
+  for (const prof of professors) {
+    if (prof.sprites) {
+      assert.equal(
+        prof.sprites.length, 3,
+        `professor "${prof.id}" sprites[] must have exactly 3 entries`
+      );
+    }
+  }
+});
+
+test('professors with sprites[] have non-empty string paths at every level', () => {
+  for (const prof of professors) {
+    if (prof.sprites) {
+      for (let i = 0; i < prof.sprites.length; i++) {
+        assert.ok(
+          typeof prof.sprites[i] === 'string' && prof.sprites[i].length > 0,
+          `professor "${prof.id}" sprites[${i}] must be a non-empty string`
+        );
+      }
+    }
+  }
+});
+
+test('professors with sprites[] have sprites[0] matching the sprite field', () => {
+  // sprites[0] is the l1 (full-HP) path and doubles as the single-image fallback.
+  for (const prof of professors) {
+    if (prof.sprites) {
+      assert.equal(
+        prof.sprites[0], prof.sprite,
+        `professor "${prof.id}" sprites[0] must match the sprite field`
+      );
+    }
+  }
+});
+
+test('schwaartz sprite paths point to the l1/l2/l3 files that exist', () => {
+  const schwaartz = professors.find(p => p.id === 'prof_schwaartz');
+  assert.ok(schwaartz.sprites, 'schwaartz should have a sprites[] array');
+  assert.ok(schwaartz.sprites[0].includes('schwaartz_l1'), 'sprites[0] should be the l1 file');
+  assert.ok(schwaartz.sprites[1].includes('schwaartz_l2'), 'sprites[1] should be the l2 file');
+  assert.ok(schwaartz.sprites[2].includes('schwaartz_l3'), 'sprites[2] should be the l3 file');
+});
