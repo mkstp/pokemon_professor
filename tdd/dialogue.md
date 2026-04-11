@@ -1,13 +1,13 @@
-# TDD: Dialogue
+# TDD: Dialogue Scene
 
-**File:** `js/dialogue.js`
+**File:** `js/scenes/DialogueScene.js`
 **Depends on:** data
 
 ---
 
 ## Responsibility
 
-Manages playback of scripted dialogue sequences and renders the dialogue box overlay. Scene-agnostic: can overlay the overworld or the battle screen. `game.js` decides when to activate it; `dialogue.js` only manages the sequence and draws the box.
+Manages playback of scripted dialogue sequences and renders the dialogue box overlay. Launched on top of the active scene — does not replace it. Stops itself when the sequence ends and notifies the calling scene, which then resumes its own logic.
 
 ---
 
@@ -19,49 +19,45 @@ Module-level object:
 
 ```js
 {
-  active: boolean,          // whether a sequence is currently playing
-  sequence: array,          // the current DialogueSequence array (from data.js)
-  currentIndex: number,     // index of the line currently displayed
+  sequence:      array,        // the DialogueSequence array from data.dialogueSequences
+  currentIndex:  number,       // index of the line currently displayed
+  onComplete:    string|null,  // event key to emit on the calling scene when the sequence ends
 }
 ```
 
 ---
 
-## Functions
+## Phaser Scene Lifecycle
 
-### init(sequenceKey)
+### init(data)
 
-- **Does:** Loads a dialogue sequence and activates the dialogue box.
-- **Inputs:** `sequenceKey` — string: key into `data.dialogueSequences` (e.g. `'prof_phonetics_pre'`).
+- **Does:** Receives launch data and loads the dialogue sequence.
+- **Inputs:** `data` — object: `{ sequenceKey: string, onComplete?: string }`.
 - **Returns:** void
-- **Side effects:** Reads `data.dialogueSequences[sequenceKey]`. Sets `dialogueState.sequence`, `dialogueState.currentIndex = 0`, `dialogueState.active = true`.
+- **Side effects:** Reads `data.dialogueSequences[sequenceKey]`. Sets `dialogueState.sequence`, `dialogueState.currentIndex = 0`, `dialogueState.onComplete = data.onComplete ?? null`.
 
 ---
+
+### create()
+
+- **Does:** Builds the dialogue box UI and displays the first line.
+- **Returns:** void
+- **Side effects:**
+  - Adds a semi-transparent `Phaser.GameObjects.Rectangle` at the bottom of the screen as the dialogue box background.
+  - Adds a `Phaser.GameObjects.Text` for the speaker name.
+  - Adds a `Phaser.GameObjects.Text` for the dialogue line body.
+  - Renders `dialogueState.sequence[0]` (speaker and line text).
+  - Binds confirm keys (Space, Enter) to `advance()`.
+
+---
+
+## Functions
 
 ### advance()
 
-- **Does:** Advances to the next line in the sequence. If the last line is already displayed, marks the sequence complete.
-- **Inputs:** none
+- **Does:** Advances to the next line in the sequence. If the sequence is complete, emits the completion event and stops the scene.
 - **Returns:** void
-- **Side effects:** Increments `dialogueState.currentIndex`. If `currentIndex >= sequence.length`, sets `dialogueState.active = false`.
-
----
-
-### draw(ctx)
-
-- **Does:** Renders the dialogue box with the current speaker name and line. No-ops if `dialogueState.active` is false.
-- **Inputs:** `ctx` — CanvasRenderingContext2D.
-- **Returns:** void
-- **Side effects:** Writes to canvas. Draws a text box at the bottom of the screen with speaker name and the current line. Retro pixel font. Does not clear the canvas — draws on top of whatever the active scene has already drawn.
-
----
-
-### isActive()
-
-- **Does:** Reports whether a dialogue sequence is currently in progress.
-- **Inputs:** none
-- **Returns:** boolean: `true` if `dialogueState.active` is true.
-- **Side effects:** none
+- **Side effects:** Increments `dialogueState.currentIndex` and updates the speaker and line Text objects. If `currentIndex >= sequence.length`: if `dialogueState.onComplete` is set, retrieves the calling scene via `this.scene.manager` and emits `onComplete` on it; calls `this.scene.stop()`.
 
 ---
 
@@ -71,4 +67,5 @@ Module-level object:
 - `data` — `dialogueSequences` object, accessed by key in `init()`
 
 **Exposes to:**
-- `game` — `init(sequenceKey)` to start a sequence; `draw(ctx)` called each frame when active (overlaid on scene); `advance()` called by `game.handleInput()` when the player presses confirm during dialogue; `isActive()` checked by `game.js` to suppress battle/movement input while dialogue is running
+- `main.js` — registered as `'DialogueScene'`
+- `OverworldScene` and `BattleScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })`; both scenes listen for the `onComplete` event to resume their logic after the sequence finishes

@@ -19,7 +19,7 @@ The game uses two distinct sprite tiers, consistent with the Pokemon source mate
 | Tier | Context | Visual role | Resolution | Production method |
 |------|---------|-------------|------------|-------------------|
 | Battle sprites | Battle scene | Detailed character portraits; the primary visual during combat | 96×96 px | AI-generated (Midjourney) → cleaned up in Aseprite |
-| Overworld sprites | Overworld map | Small top-down figures conveying silhouette and colour; not portraits | 24×24 px | Hand-drawn in Aseprite |
+| Overworld sprites | Overworld map | Small top-down figures conveying silhouette and colour; not portraits | 32×32 px | Hand-drawn in Aseprite |
 
 These tiers are independent. A battle sprite and an overworld sprite for the same character do not need to match in detail — they need to share dominant colour and be recognisable as the same character at their respective scales.
 
@@ -49,16 +49,16 @@ Each professor requires:
 
 ### Professor overworld sprite sheet (per professor)
 
-A single PNG, 48×24 px: two frames side by side.
+A single PNG, 64×32 px: two frames side by side.
 
 ```
 [ frame 0 | frame 1 ]
-  24×24      24×24
+  32×32      32×32
 ```
 
 ### Player overworld sprite sheet
 
-A single PNG, 72×96 px: 4 rows (directions) × 3 columns (frames).
+A single PNG, 96×128 px: 4 rows (directions) × 3 columns (frames).
 
 ```
 Row 0 (down):  [ L | C | R ]
@@ -67,7 +67,7 @@ Row 2 (right): [ L | C | R ]
 Row 3 (up):    [ L | C | R ]
 ```
 
-Each cell is 24×24 px.
+Each cell is 32×32 px.
 
 ### Battle sprites
 
@@ -134,9 +134,9 @@ player: {
 
 ## Asset Loading
 
-`engine.js` preloads all sprites at game start. Each path is fetched and stored as an `HTMLImageElement` in an `assets` object keyed by the file path string. Consumers call `engine.getAsset(path)` to retrieve a loaded image.
+Sprites are loaded by the Phaser scenes that use them, via `this.load.image()` and `this.load.spritesheet()` in each scene's `preload()` method. `OverworldScene` loads overworld spritesheets; `BattleScene` loads battle sprites. Phaser caches loaded textures globally — an asset loaded by one scene is available to all subsequent scenes without reloading.
 
-Preloading all assets before the first frame avoids mid-game load delays. If an asset fails to load, the engine logs a warning and draws a magenta fallback rectangle in its place — this makes missing assets immediately visible during development.
+Sprite paths in `data.js` (`professor.sprites.battle`, `professor.sprites.overworld`) serve as the texture keys passed to `this.load` calls. If a texture key is not found at render time, Phaser renders a default missing-texture indicator — this makes missing assets immediately visible during development.
 
 ---
 

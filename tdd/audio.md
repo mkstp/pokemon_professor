@@ -1,13 +1,13 @@
-# TDD: Audio
+# TDD: Audio Scene
 
-**File:** `js/audio.js`
+**File:** `js/scenes/AudioScene.js`
 **Depends on:** data
 
 ---
 
 ## Responsibility
 
-Manages background music playback. Loads tracks defined in `data.audioTracks`, plays the correct track for the active scene, and handles switching without overlap. Does not manage sound effects — music only in the proof-of-concept.
+Manages all background music playback. Runs as a persistent, always-active Phaser scene so that music continues uninterrupted across overworld/battle scene transitions. Other scenes access it via `this.scene.get('AudioScene')`.
 
 ---
 
@@ -15,28 +15,28 @@ Manages background music playback. Loads tracks defined in `data.audioTracks`, p
 
 ### tracks
 
-Module-level object mapping track ids to loaded `Audio` instances:
+Module-level object mapping track ids to Phaser `BaseSound` instances:
 
 ```js
 {
-  'overworld': Audio,           // HTMLAudioElement, looping
-  'dungeon': Audio,             // HTMLAudioElement, looping
-  'indoor': Audio,              // HTMLAudioElement, looping
-  'cafeteria': Audio,           // HTMLAudioElement, looping
-  'castle': Audio,              // HTMLAudioElement, looping
-  'battle_schwaartz': Audio,    // HTMLAudioElement, looping
-  'battle_syntaxa': Audio,      // HTMLAudioElement, looping
-  'battle_composita': Audio,    // HTMLAudioElement, looping
-  'battle_recursio': Audio,     // HTMLAudioElement, looping
-  'battle_bayesio': Audio,      // HTMLAudioElement, looping
-  'battle_vec_tor': Audio,      // HTMLAudioElement, looping
-  'battle_parsemore': Audio,    // HTMLAudioElement, looping
-  'victory': Audio,             // HTMLAudioElement, non-looping
-  'defeat': Audio,              // HTMLAudioElement, non-looping
+  'overworld':         BaseSound,  // looping
+  'dungeon':           BaseSound,  // looping
+  'indoor':            BaseSound,  // looping
+  'cafeteria':         BaseSound,  // looping
+  'castle':            BaseSound,  // looping
+  'battle_schwaartz':  BaseSound,  // looping
+  'battle_syntaxa':    BaseSound,  // looping
+  'battle_composita':  BaseSound,  // looping
+  'battle_recursio':   BaseSound,  // looping
+  'battle_bayesio':    BaseSound,  // looping
+  'battle_vec_tor':    BaseSound,  // looping
+  'battle_parsemore':  BaseSound,  // looping
+  'victory':           BaseSound,  // non-looping
+  'defeat':            BaseSound,  // non-looping
 }
 ```
 
-Populated in `init()`. Keys match `AudioTrack.id` values in `data.audioTracks`.
+Populated in `create()`. Keys match `AudioTrack.id` values in `data.audioTracks`.
 
 ---
 
@@ -46,41 +46,51 @@ Module-level string: the id of the track currently playing, or `null` if nothing
 
 ---
 
+## Phaser Scene Lifecycle
+
+### preload()
+
+- **Does:** Queues all audio files for loading.
+- **Returns:** void
+- **Side effects:** Calls `this.load.audio(id, path)` for each entry in `data.audioTracks`.
+
+---
+
+### create()
+
+- **Does:** Adds all loaded audio files as `BaseSound` instances and marks this scene as persistent.
+- **Returns:** void
+- **Side effects:**
+  - Calls `this.sound.add(id, { loop })` for each track in `data.audioTracks`; stores results in `tracks`.
+  - Calls `this.scene.setActive(true).setVisible(false)` to keep the scene running without rendering anything.
+
+---
+
 ## Functions
 
-### init()
+### switchTo(trackId)
 
-- **Does:** Creates an `Audio` instance for each track defined in `data.audioTracks` and stores them in the `tracks` object.
-- **Inputs:** none
+- **Does:** Stops the currently playing track (if any) and starts the specified track. No-ops if the track is already playing.
+- **Inputs:** `trackId` — string: id of the track to switch to.
 - **Returns:** void
-- **Side effects:** Instantiates `Audio` objects with `src` from `data.audioTracks`. Sets `loop` property per track definition. Does not begin playback.
+- **Side effects:** Stops and resets `tracks[currentTrackId]` if it differs from `trackId`. Calls `tracks[trackId].play()`. Updates `currentTrackId`.
 
 ---
 
 ### play(trackId)
 
-- **Does:** Starts playback of the specified track from the beginning.
+- **Does:** Plays a track from the beginning without stopping the current background track.
 - **Inputs:** `trackId` — string: id of the track to play.
 - **Returns:** void
-- **Side effects:** Calls `.play()` on `tracks[trackId]`. Sets `currentTrackId = trackId`. No-ops if `trackId` is not in `tracks`.
+- **Side effects:** Calls `tracks[trackId].play()`. Used for one-shot sounds (victory, defeat) that overlay the current music.
 
 ---
 
 ### stop()
 
-- **Does:** Stops the currently playing track and resets its position.
-- **Inputs:** none
+- **Does:** Stops the currently playing background track and resets its position.
 - **Returns:** void
-- **Side effects:** Calls `.pause()` and resets `.currentTime = 0` on `tracks[currentTrackId]` if one is playing. Sets `currentTrackId = null`.
-
----
-
-### switchTo(trackId)
-
-- **Does:** Stops the current track (if any) and starts the specified track. No-ops if the specified track is already playing.
-- **Inputs:** `trackId` — string: id of the track to switch to.
-- **Returns:** void
-- **Side effects:** Calls `stop()` if a different track is playing. Calls `play(trackId)`.
+- **Side effects:** Calls `.stop()` on `tracks[currentTrackId]`. Sets `currentTrackId = null`.
 
 ---
 
@@ -90,4 +100,5 @@ Module-level string: the id of the track currently playing, or `null` if nothing
 - `data` — `audioTracks` array for track ids, file paths, and loop settings
 
 **Exposes to:**
-- `game` — `init()` on startup; `switchTo(trackId)` called on scene transitions; `play('victory')` and `play('defeat')` called on battle resolution. For battles, `game.js` calls `switchTo('battle_' + professorId)` using the professor's id field from `data.js`.
+- `main.js` — registered as `'AudioScene'`; started alongside `OverworldScene` on game launch
+- `OverworldScene`, `BattleScene` — call `this.scene.get('AudioScene').switchTo(trackId)` on scene create and transitions; call `.play('victory')` or `.play('defeat')` on battle resolution

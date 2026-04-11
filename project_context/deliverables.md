@@ -21,7 +21,7 @@ Issue: test_project-1dp
 **DEL-003: Technical Design Document Suite**
 Seven TDD files in `tdd/`: `game.md`, `engine.md`, `data.md`, `map.md`, `battle.md`, `dialogue.md`, `audio.md`. Each defines the module's responsibility, data structures, function contracts, and module interfaces.
 Justification: First-class portfolio artefact documenting implementation contracts before code is written. Demonstrates disciplined, spec-first development.
-Issue: test_project-bjm *(closed — complete)*
+Issue: test_project-bjm *(closed — original vanilla JS suite complete; revised for Phaser 3 architecture via test_project-csz)*
 
 ---
 

@@ -1,13 +1,13 @@
-# TDD: Battle
+# TDD: Battle Scene
 
-**File:** `js/battle.js`
+**File:** `js/scenes/BattleScene.js`
 **Depends on:** engine, data
 
 ---
 
 ## Responsibility
 
-Owns the turn-based battle loop: move selection, damage resolution, and HP management. Renders the battle screen. Signals `game.js` when the battle ends by writing outcome to engine state. Does not manage dialogue — `game.js` activates `dialogue.js` before and after battle.
+Owns the turn-based battle loop: move selection, damage resolution, and HP management. Renders all battle UI as Phaser GameObjects. Returns control to `OverworldScene` when the battle ends. Does not manage dialogue — `OverworldScene` launches `DialogueScene` before the battle; `BattleScene` launches it after.
 
 ---
 
@@ -15,98 +15,95 @@ Owns the turn-based battle loop: move selection, damage resolution, and HP manag
 
 ### battleState
 
-Module-level object, active only during a battle scene:
+Module-level object, active only during a battle:
 
 ```js
 {
-  professor: object,        // the Professor object from data.js for this encounter
-  professorHP: number,      // professor's current HP (starts at professor.hp)
-  playerMoves: array,       // player's available Move objects (from data.playerMoves)
-  selectedMoveIndex: number,// index of the currently highlighted move (0–3)
-  phase: string,            // 'select' | 'resolve' | 'end'
-  lastActionText: string,   // description of the last action, shown in battle log
-  outcome: string|null,     // null during battle; 'win' | 'loss' on resolution
+  professor:          object,      // the Professor object from data.js for this encounter
+  professorHP:        number,      // professor's current HP (starts at professor.hp)
+  playerMoves:        array,       // player's available Move objects (from data.playerMoves)
+  selectedMoveIndex:  number,      // index of the currently highlighted move (0–3)
+  phase:              string,      // 'select' | 'resolve' | 'end'
+  lastActionText:     string,      // description of the last action, shown in the battle log
+  outcome:            string|null, // null during battle; 'win' | 'loss' | 'fled' on resolution
+  disrupted:          boolean,     // true if the 'disrupt' move effect is active on the player
 }
 ```
 
 ---
 
-## Functions
+## Phaser Scene Lifecycle
 
-### init(professorId)
+### init(data)
 
-- **Does:** Prepares the battle state for a new encounter.
-- **Inputs:** `professorId` — string: id of the professor to battle.
+- **Does:** Receives scene launch data and stores the professor id for use in `create()`.
+- **Inputs:** `data` — object: `{ professorId: string }`, passed by `OverworldScene` via `this.scene.start('BattleScene', data)`.
 - **Returns:** void
-- **Side effects:** Reads professor data from `data.professors`. Sets module-level `battleState` with professor, full professor HP, player moves, `selectedMoveIndex: 0`, `phase: 'select'`, `lastActionText: ''`, `outcome: null`. Does not modify engine state.
+- **Side effects:** Stores `data.professorId` as a scene-level variable.
+
+---
+
+### create()
+
+- **Does:** Builds all battle UI GameObjects and initialises `battleState`.
+- **Returns:** void
+- **Side effects:**
+  - Reads the professor definition from `data.professors`. Sets `battleState` to starting values.
+  - Adds professor sprite (`Phaser.GameObjects.Image`) and player sprite (back-facing).
+  - Creates HP bars for player and professor as `Phaser.GameObjects.Graphics` objects.
+  - Creates move menu as four `Phaser.GameObjects.Text` objects; highlights `selectedMoveIndex`.
+  - Creates a battle log `Phaser.GameObjects.Text` for `lastActionText`.
+  - Binds keyboard input: arrow keys update `selectedMoveIndex` and re-render the move menu; Enter/Space calls `selectMove()`; Escape or 'r' calls `flee()`.
+  - Calls `this.scene.get('AudioScene').switchTo('battle_' + professorId)`.
 
 ---
 
 ### update()
 
-- **Does:** Advances battle logic by one frame. In `'select'` phase, waits for input. In `'resolve'` phase, executes the selected move and professor's response, then returns to `'select'` or transitions to `'end'`.
-- **Inputs:** none
+- **Does:** Advances battle logic each frame. No-ops unless phase is `'resolve'` or `'end'`.
 - **Returns:** void
-- **Side effects:** May call `resolveTurn()`. May call `engine.setPlayerHP()`, `engine.defeatProfessor()`. Sets `battleState.phase` and `battleState.outcome` on resolution.
+- **Side effects:** If `battleState.phase === 'resolve'`, calls `resolveTurn()`. If `battleState.phase === 'end'`, calls `endBattle()`.
 
 ---
 
-### draw(ctx)
-
-- **Does:** Renders the full battle screen: professor sprite, HP bars (player and professor), move selection menu, and last action text.
-- **Inputs:** `ctx` — CanvasRenderingContext2D.
-- **Returns:** void
-- **Side effects:** Writes to canvas. Reads `battleState` and `engine.getState().playerHP`.
-
----
-
-### handleInput(key)
-
-- **Does:** Routes input during the battle scene. Moves the move cursor or confirms selection.
-- **Inputs:** `key` — string: key identifier.
-- **Returns:** void
-- **Side effects:** Updates `battleState.selectedMoveIndex` on arrow key. Calls `selectMove(battleState.selectedMoveIndex)` on confirm key (Enter or Space). On 'r' or Escape, calls `flee()`.
-
----
+## Functions
 
 ### selectMove(moveIndex)
 
-- **Does:** Locks in the player's selected move and transitions battle phase to `'resolve'`.
+- **Does:** Locks in the player's chosen move and sets the battle phase to `'resolve'`.
 - **Inputs:** `moveIndex` — number: index into `battleState.playerMoves`.
 - **Returns:** void
-- **Side effects:** Writes `battleState.phase = 'resolve'`. Stores the selected move for `resolveTurn()`.
+- **Side effects:** Stores the selected move for use in `resolveTurn()`. Sets `battleState.phase = 'resolve'`.
 
 ---
 
 ### resolveTurn()
 
-- **Does:** Applies the player's move to the professor, then applies the professor's move to the player. Checks for win or loss after each application.
-- **Inputs:** none
+- **Does:** Applies the player's move to the professor, then applies the professor's move to the player. Checks win/loss after each step.
 - **Returns:** void
 - **Side effects:**
-  - Reduces `battleState.professorHP` by player move damage. Applies move effect if present (see Move effects below).
+  - Reduces `battleState.professorHP` by player move damage (halved first if `battleState.disrupted` is true; resets `disrupted` afterwards). Applies move effect if present (see Move Effects below).
   - If `professorHP <= 0`: calls `engine.defeatProfessor(professorId)`, sets `battleState.phase = 'end'`, `battleState.outcome = 'win'`. Does not proceed to professor move.
-  - Otherwise: selects professor move (random from professor's move list), reduces player HP via `engine.setPlayerHP()`.
-  - If `engine.getState().playerHP <= 0`: sets `battleState.phase = 'end'`, `battleState.outcome = 'loss'`. (`engine.setPlayerHP()` will call `engine.resetGame()` automatically.)
-  - Updates `battleState.lastActionText` with a plain-English description of what happened.
+  - Otherwise: selects a professor move at random; reduces player HP via `engine.setPlayerHP()`. (`engine.setPlayerHP()` calls `engine.resetGame()` automatically if HP reaches zero.)
+  - If player HP reaches zero: sets `battleState.phase = 'end'`, `battleState.outcome = 'loss'`.
+  - Updates `battleState.lastActionText`. Redraws HP bar Graphics and battle log Text.
+  - If phase was not set to `'end'`, resets `battleState.phase = 'select'`.
 
 ---
 
 ### flee()
 
-- **Does:** Exits the battle without resolution. Returns the player to the overworld.
-- **Inputs:** none
+- **Does:** Exits the battle without resolution.
 - **Returns:** void
-- **Side effects:** Sets `battleState.outcome = 'fled'`. `game.js` reads this on the next frame and calls `switchScene('overworld')`. Professor is not marked as defeated.
+- **Side effects:** Sets `battleState.outcome = 'fled'`. Sets `battleState.phase = 'end'` to trigger `endBattle()` on the next frame.
 
 ---
 
-### getOutcome()
+### endBattle()
 
-- **Does:** Returns the current battle outcome so `game.js` can react to it.
-- **Inputs:** none
-- **Returns:** string|null: `'win'` | `'loss'` | `'fled'` | `null` (battle ongoing).
-- **Side effects:** none
+- **Does:** Stops the battle scene and returns control to `OverworldScene`.
+- **Returns:** void
+- **Side effects:** If outcome is `'win'`, launches `DialogueScene` with the post-battle sequence key and waits for it to complete before waking the overworld. Calls `this.scene.get('AudioScene').switchTo('overworld')`. Stops this scene and wakes `OverworldScene` via `this.scene.wake('OverworldScene')`.
 
 ---
 
@@ -115,9 +112,9 @@ Module-level object, active only during a battle scene:
 Three optional effect types, applied in `resolveTurn()` after damage:
 
 | Effect | Behaviour |
-|--------|-----------|
-| `'disrupt'` | Player's next move deals half damage. Tracked via a `disrupted` flag in `battleState`. |
-| `'self_damage'` | After dealing damage, the professor also takes recoil damage (25% of move damage). |
+|---|---|
+| `'disrupt'` | Sets `battleState.disrupted = true`. The player's next move deals half damage; the flag resets after it is applied. |
+| `'self_damage'` | After dealing damage, the professor also takes recoil damage equal to 25% of the move's damage value. |
 | `'deferred'` | Damage is not applied immediately — stored and applied at the start of the professor's next turn. |
 
 ---
@@ -125,8 +122,11 @@ Three optional effect types, applied in `resolveTurn()` after damage:
 ## Module Interfaces
 
 **Reads from:**
-- `engine` — player HP (for display and loss detection); clears `pendingEncounter` indirectly via `game.js`
+- `engine` — player HP (display and loss detection); `defeatProfessor()`, `setPlayerHP()`
 - `data` — professor definitions (HP, moves), player move definitions
 
 **Exposes to:**
-- `game` — `init(professorId)`, `update()`, `draw(ctx)`, `handleInput(key)`, `getOutcome()` — called by the game loop each frame during the battle scene
+- `main.js` — registered as `'BattleScene'`
+- `OverworldScene` — started via `this.scene.start('BattleScene', { professorId })`; returns by waking `OverworldScene` when the battle ends
+- `AudioScene` — accessed via `this.scene.get('AudioScene').switchTo(trackId)`
+- `DialogueScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })` for post-battle dialogue

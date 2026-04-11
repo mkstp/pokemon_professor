@@ -135,4 +135,4 @@ Owns the single `gameState` object — the authoritative record of everything th
 ## Module Interfaces
 
 **Reads from:** `data` — region entry positions when `setRegion()` is called.
-**Exposes to:** All modules — `engine.js` is the shared state layer. Every module that needs to read or write game state imports and calls engine functions.
+**Exposes to:** All Phaser scenes — `engine.js` is the shared state layer. Every scene that needs to read or write game state imports and calls engine functions.

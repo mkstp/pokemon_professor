@@ -1,83 +1,64 @@
-# TDD: Map
+# TDD: Overworld Scene
 
-**File:** `js/map.js`
-**Depends on:** engine, data
+**File:** `js/scenes/OverworldScene.js`
+**Depends on:** engine, data, visuals
 
 ---
 
 ## Responsibility
 
-Renders the tile-based overworld: tiles, player sprite, weather overlays, and atmospheric effects. Handles player movement, detects encounter triggers, and detects region transitions. Signals encounters to `game.js` by writing to engine state; does not resolve them.
+Renders the tile-based campus map and handles all overworld gameplay: player movement, encounter trigger detection, and region transitions. Delegates weather effects to `visuals.js`. Transitions to `BattleScene` on encounter; launches `DialogueScene` for overworld dialogue.
 
 ---
 
 ## Data Structures
 
-### inputState
-
-Module-level object tracking which movement keys are currently held:
-
-```js
-{
-  up: boolean,
-  down: boolean,
-  left: boolean,
-  right: boolean,
-}
-```
-
-Updated by `handleInput()`. Read by `update()` each frame to compute movement.
+None. Scene-level references (player sprite, active tilemap layers, weather emitter) are stored as Phaser GameObjects on `this` — not as plain data structures.
 
 ---
 
-## Functions
+## Phaser Scene Lifecycle
 
-### init(ctx)
+### preload()
 
-- **Does:** Stores the canvas context and loads the tile spritesheet. Reads starting region and player position from engine state.
-- **Inputs:** `ctx` — CanvasRenderingContext2D: the game canvas context.
+- **Does:** Queues all overworld assets for loading before the scene starts.
 - **Returns:** void
-- **Side effects:** Stores `ctx` reference. Loads tile and player sprite images. Reads `engine.getState().currentRegion` and `engine.getState().playerPosition` to set initial render state.
+- **Side effects:** Calls `this.load.image` and `this.load.spritesheet` to queue: tileset PNG, player walk spritesheet, professor NPC spritesheets. Tilemap tile data comes from `data.regions[id].tileMap` (inline 2D array) and is passed directly to `this.make.tilemap({ data, tileWidth, tileHeight })` — no external Tiled JSON file is used.
 
 ---
 
-### update()
+### create()
 
-- **Does:** Moves the player based on current input, checks for region transitions, and checks for encounter triggers.
-- **Inputs:** none
+- **Does:** Builds the tilemap, player sprite, input bindings, and initial weather effect. Called by Phaser after `preload()` completes.
 - **Returns:** void
 - **Side effects:**
-  - Reads `inputState` to compute next player position.
-  - Calls `engine.setPlayerPosition(x, y)` if movement is valid (target tile is walkable).
-  - Calls `checkRegionTransition(x, y)` — if triggered, calls `engine.setRegion(targetRegion)`.
-  - Calls `checkEncounterTrigger(x, y)` — if triggered, calls `engine.setPendingEncounter(professorId)`.
+  - Creates tilemap from loaded data; adds tileset; creates base and collision tile layers.
+  - Sets collision on tiles with the property `collides: true` (configured in Tiled).
+  - Adds player sprite at the pixel position corresponding to `engine.getState().playerPosition`.
+  - Binds cursor keys via `this.input.keyboard.createCursorKeys()`.
+  - Reads `engine.getState().currentRegion`; calls `visuals.createWeather(this, region.weatherEffect)` if the region has a weather effect.
+  - Calls `this.scene.get('AudioScene').switchTo('overworld')`.
+  - Reads `engine.getState().defeatedProfessors` to hide NPC sprites for defeated professors.
 
 ---
 
-### draw(ctx)
+### update(time, delta)
 
-- **Does:** Draws the current region in layer order: tiles → professor sprites (if not defeated) → player sprite → weather overlay.
-- **Inputs:** `ctx` — CanvasRenderingContext2D.
+- **Does:** Processes tile-based player movement and checks for encounter and transition triggers after each step.
+- **Inputs:** `time` — number: ms since game start; `delta` — number: ms since last frame.
 - **Returns:** void
-- **Side effects:** Writes to canvas. Reads `engine.getState()` for player position and defeated professors. Reads `data.regions[currentRegion]` for tile layout and weather effect.
-
----
-
-### handleInput(key)
-
-- **Does:** Updates `inputState` when a movement key is pressed or released.
-- **Inputs:** `key` — string: the key identifier (e.g. `'ArrowUp'`, `'w'`).
-- **Returns:** void
-- **Side effects:** Writes to module-level `inputState`.
+- **Side effects:**
+  - On directional key press (debounced — one tile per keydown event): computes target tile. If the target tile is walkable (not collision-flagged), tweens the player sprite to the new pixel position and calls `engine.setPlayerPosition(x, y)`.
+  - After each completed move, calls `checkEncounterTrigger(x, y)` and `checkRegionTransition(x, y)`.
 
 ---
 
 ### checkEncounterTrigger(x, y)
 
-- **Does:** Checks whether the player's current tile is a professor encounter trigger. Gates the castle encounter on `engine.allProfessorsDefeated()`.
+- **Does:** Checks whether the player's current tile matches an encounter trigger for an undefeated professor.
 - **Inputs:** `x` — number: tile column; `y` — number: tile row.
 - **Returns:** void
-- **Side effects:** If the tile matches an entry in `data.regions[currentRegion].encounterTiles` and the professor is not already defeated, calls `engine.setPendingEncounter(professorId)`. If the tile is the castle encounter and `engine.allProfessorsDefeated()` is false, does nothing (path remains blocked).
+- **Side effects:** Reads `data.regions[regionId].encounterTiles`. If the tile matches a professor who is not defeated (`engine.isDefeated(id)` is false), calls `engine.setPendingEncounter(professorId)` then launches `DialogueScene` with the pre-battle sequence key. The castle encounter additionally requires `engine.allProfessorsDefeated()` to return true before triggering.
 
 ---
 
@@ -86,24 +67,19 @@ Updated by `handleInput()`. Read by `update()` each frame to compute movement.
 - **Does:** Checks whether the player's current tile is a region transition point.
 - **Inputs:** `x` — number: tile column; `y` — number: tile row.
 - **Returns:** void
-- **Side effects:** If the tile matches a connection in `data.regions[currentRegion].connections`, calls `engine.setRegion(targetRegion)` with the target tile as the entry position.
-
----
-
-### drawWeather(ctx)
-
-- **Does:** Renders the weather overlay for the current region.
-- **Inputs:** `ctx` — CanvasRenderingContext2D.
-- **Returns:** void
-- **Side effects:** Writes to canvas. Effect type is read from `data.regions[currentRegion].weatherEffect`. No-ops if `weatherEffect` is null.
+- **Side effects:** Reads `data.regions[regionId].connections`. If the tile matches a connection, calls `engine.setRegion(targetId)` and restarts the scene to load the new region's tilemap and weather.
 
 ---
 
 ## Module Interfaces
 
 **Reads from:**
-- `engine` — player position, current region, defeated professors list, `allProfessorsDefeated()` result
+- `engine` — player position, current region, defeated professors; `isDefeated()`, `allProfessorsDefeated()`, `setPlayerPosition()`, `setRegion()`, `setPendingEncounter()`
 - `data` — region tile maps, encounter tiles, region connections, weather effects
+- `visuals` — `createWeather(scene, weatherType)`, called in `create()`
 
 **Exposes to:**
-- `game` — `init(ctx)`, `update()`, `draw(ctx)`, `handleInput(key)` called by the game loop each frame during the overworld scene
+- `main.js` — registered as `'OverworldScene'`; first scene started on game launch
+- `BattleScene` — started via `this.scene.start('BattleScene', { professorId })` after pre-battle dialogue completes
+- `DialogueScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })` for pre/post-encounter dialogue
+- `AudioScene` — accessed via `this.scene.get('AudioScene').switchTo(trackId)`

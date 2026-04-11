@@ -106,7 +106,7 @@ dialogueSequences = {
 
 ### init()
 
-- **Does:** No-op for `data.js` — all data is defined at module load time as constants. Included for interface consistency with other modules.
+- **Does:** No-op — all data is defined at module load time as constants. Exported to satisfy callers that call `init()` on every module; has no effect.
 - **Inputs:** none
 - **Returns:** void
 - **Side effects:** none
@@ -121,6 +121,7 @@ dialogueSequences = {
 |--------|------|----------|
 | `professors` | array | All six Professor objects, ordered by encounter sequence |
 | `playerMoves` | array | All player Move objects |
+| `professorMoves` | array | All professor Move objects |
 | `dialogueSequences` | object | All DialogueSequence arrays, keyed by sequence id |
 | `regions` | object | All Region objects, keyed by region id |
 | `audioTracks` | array | All AudioTrack objects |
@@ -130,4 +131,4 @@ dialogueSequences = {
 ## Module Interfaces
 
 **Reads from:** none
-**Exposes to:** `engine` (region entry positions), `map` (region definitions, encounter tiles), `battle` (professor stats, moves), `dialogue` (dialogue sequences), `audio` (track definitions), `game` (professor list for encounter routing)
+**Exposes to:** `engine` (region entry positions), `OverworldScene` (region definitions, encounter tiles), `BattleScene` (professor stats, moves), `DialogueScene` (dialogue sequences), `AudioScene` (track definitions)
