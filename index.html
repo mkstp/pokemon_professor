@@ -2,17 +2,77 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pokemon Professor</title>
+  <title>Pokemon Professor — Dev Hub</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    body {
+      background: #0f0f1a;
+      color: #aaaacc;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    h1 {
+      font-size: 20px;
+      color: #ccccff;
+      letter-spacing: 3px;
+      margin-bottom: 8px;
+    }
+    .sub {
+      font-size: 11px;
+      color: #555577;
+      margin-bottom: 48px;
+    }
+    .menu {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 380px;
+    }
+    a.option {
+      display: block;
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      padding: 16px 20px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    a.option:hover {
+      background: #2a2a4a;
+      border-color: #5555aa;
+    }
+    .option-title {
+      display: block;
+      font-size: 14px;
+      color: #ccccff;
+      margin-bottom: 5px;
+    }
+    .option-desc {
+      display: block;
+      font-size: 11px;
+      color: #666688;
+    }
   </style>
 </head>
 <body>
-  <!-- Phaser 3 loaded as a local file — no CDN, no build step. -->
-  <script src="vendor/phaser.min.js"></script>
-  <!-- main.js is an ES module; it imports all scene files. -->
-  <script type="module" src="js/main.js"></script>
+  <h1>POKEMON PROFESSOR</h1>
+  <p class="sub">dev hub</p>
+  <nav class="menu">
+    <a class="option" href="game.html">
+      <span class="option-title">▶  Full Game</span>
+      <span class="option-desc">Start from the overworld — the complete game loop</span>
+    </a>
+    <a class="option" href="debug.html">
+      <span class="option-title">⚔  Battle Debug</span>
+      <span class="option-desc">Select any professor and jump straight into battle</span>
+    </a>
+    <a class="option" href="tests/index.html">
+      <span class="option-title">✓  Run Tests</span>
+      <span class="option-desc">Unit tests for engine, data, and battle scene logic</span>
+    </a>
+  </nav>
 </body>
 </html>

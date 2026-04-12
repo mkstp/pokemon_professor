@@ -182,6 +182,36 @@ export const professorMoves = [
     effect: null,
   },
 
+  // ── Prof. Parsemore — Computational Linguistics / Corpus Analysis (Secret Boss) ──
+  {
+    id: 'chunker',
+    name: 'Chunker',
+    damage: 20,
+    description: 'Rapid shallow parsing — hits fast and covers ground before the student can react.',
+    effect: null,
+  },
+  {
+    id: 'dep_parse',
+    name: 'Dep. Parse',
+    damage: 26,
+    description: 'Identifies the structural weak point and targets it precisely. Disrupts the student\'s next move.',
+    effect: 'disrupt',
+  },
+  {
+    id: 'corpus_crush',
+    name: 'Corpus Crush',
+    damage: 42,
+    description: 'The weight of 400 million tokens, applied at once. Recoil: even the corpus takes a toll.',
+    effect: 'self_damage',
+  },
+  {
+    id: 'full_parse',
+    name: 'Full Parse',
+    damage: 50,
+    description: 'An exhaustive structural analysis. Leaves nowhere to hide — but the effect arrives next turn.',
+    effect: 'deferred',
+  },
+
   // ── Prof. Vec Tor — Computational Semantics (Final Boss) ──────────────────
   {
     id: 'word2vec',
@@ -420,6 +450,29 @@ export const professors = [
     ],
     battleMusic: 'battle_prof_vec_tor',
   },
+  {
+    id: 'prof_parsemore',
+    name: 'Prof. Parsemore',
+    field: 'Computational Linguistics / Corpus Analysis',
+    hp: 200,
+    location: {
+      region: 'courtyard',
+      tile: { x: 5, y: 2 },
+    },
+    moves: ['chunker', 'dep_parse', 'corpus_crush', 'full_parse'],
+    dialogue: {
+      preBattle: 'prof_parsemore_pre',
+      postWin:   'prof_parsemore_win',
+      postLoss:  'prof_parsemore_loss',
+    },
+    sprite:  'assets/sprites/battle/parsemore_l1.png',
+    sprites: [
+      'assets/sprites/battle/parsemore_l1.png',
+      'assets/sprites/battle/parsemore_l2.png',
+      'assets/sprites/battle/parsemore_l3.png',
+    ],
+    battleMusic: 'battle_prof_parsemore',
+  },
 ];
 
 // ─── DIALOGUE SEQUENCES ───────────────────────────────────────────────────────
@@ -487,6 +540,18 @@ export const dialogueSequences = {
   ],
   'prof_bayesio_loss': [
     { speaker: 'Prof. Bayesio', line: 'Posterior confirmed. Don\'t worry — that\'s what learning rate schedules are for.' },
+  ],
+
+  // ── Prof. Parsemore ───────────────────────────────────────────────────────
+  'prof_parsemore_pre': [
+    { speaker: 'Prof. Parsemore', line: 'You want to argue about language? Good. I have 400 million tokens that say you\'re wrong.' },
+    { speaker: 'Prof. Parsemore', line: 'Let\'s see your evidence.' },
+  ],
+  'prof_parsemore_win': [
+    { speaker: 'Prof. Parsemore', line: 'Interesting. You found a counterexample I hadn\'t annotated. I\'m adding it to the corpus.' },
+  ],
+  'prof_parsemore_loss': [
+    { speaker: 'Prof. Parsemore', line: 'As expected. The data doesn\'t lie.' },
   ],
 
   // ── Prof. Vec Tor ─────────────────────────────────────────────────────────
@@ -609,19 +674,23 @@ export const regions = {
   graduate_lounge: {
     id: 'graduate_lounge',
     displayName: 'Graduate Lounge',
+    // North wall (row 0, col 5): code-gated door to the courtyard.
+    // The code gate is enforced by map.js — the connection entry exists here
+    // so the region graph is complete; access logic lives in the map module.
     tileMap: [
-      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 1, 1, 1, 1, 0, 1, 1, 1, 1],  // col 5 = code-gated door to courtyard
       [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
       [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
       [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
       [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
       [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
       [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-      [1, 1, 1, 1, 1, 0, 1, 1, 1, 1],  // exit at col 5
+      [1, 1, 1, 1, 1, 0, 1, 1, 1, 1],  // col 5 = exit to main building
     ],
     entryPosition: { x: 5, y: 1 },
     connections: [
       { tile: { x: 5, y: 7 }, targetRegion: 'main_building', targetTile: { x: 6, y: 6 } },
+      { tile: { x: 5, y: 0 }, targetRegion: 'courtyard',     targetTile: { x: 5, y: 6 } },  // code-gated
     ],
     weatherEffect: null,
     music: 'indoor',
@@ -677,6 +746,33 @@ export const regions = {
     music: 'indoor',
     encounterTiles: [
       { tile: { x: 7, y: 2 }, professorId: 'prof_bayesio' },  // GPU lab, upper floor
+    ],
+  },
+
+  courtyard: {
+    id: 'courtyard',
+    displayName: 'The Courtyard',
+    // Secret area behind the main building, accessible only via a code-gated
+    // door in the graduate lounge. Prof. Parsemore waits at the far end.
+    // Enclosed on all sides — no exits except back through the door.
+    tileMap: [
+      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],  // north wall — enclosed
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],  // Parsemore at col 5
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      [1, 1, 1, 1, 1, 0, 1, 1, 1, 1],  // col 5 = exit south to graduate lounge
+    ],
+    entryPosition: { x: 5, y: 6 },
+    connections: [
+      { tile: { x: 5, y: 7 }, targetRegion: 'graduate_lounge', targetTile: { x: 5, y: 1 } },
+    ],
+    weatherEffect: 'mist',
+    music: 'indoor',
+    encounterTiles: [
+      { tile: { x: 5, y: 2 }, professorId: 'prof_parsemore' },
     ],
   },
 

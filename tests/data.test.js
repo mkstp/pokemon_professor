@@ -103,8 +103,8 @@ test('playerMove ids are unique', () => {
 
 // ─── PROFESSORS — structure ───────────────────────────────────────────────────
 
-test('professors contains exactly 6 entries', () => {
-  assert.equal(professors.length, 6);
+test('professors contains exactly 7 entries', () => {
+  assert.equal(professors.length, 7);
 });
 
 test('every professor has required fields', () => {

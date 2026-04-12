@@ -24,7 +24,7 @@ const PROF_SPRITE_SCALE = 1; // 192 px source → displayed at native size
 // Player sprite: back-facing, lower-left of the battle area.
 const PLAYER_SPRITE_X     = 107;
 const PLAYER_SPRITE_Y     = 178;
-const PLAYER_SPRITE_SCALE = 0.5;
+const PLAYER_SPRITE_SCALE = 0.55;
 
 // Professor HP info box: top-left of battle area.
 const PROF_HP_LABEL_X = 14;
@@ -62,7 +62,9 @@ const HP_POST_PAUSE = 500;
 const PROF_MOVE_MAP = Object.fromEntries(professorMoves.map(m => [m.id, m]));
 
 // The four moves available to the player in battle, in display order.
-// data.js defines more moves; this list selects and orders the active subset.
+// data.js defines six player moves; this list is an intentional subset.
+// Excluded: 'cite_this' (skip) and 'hot_take' (clear_debuff) — kept in data.js
+// for completeness but not wired into the active battle UI in this milestone.
 const ACTIVE_MOVE_IDS = ['non_sequitur', 'all_nighter', 'counterexample', 'correction'];
 
 // Top-level action menu labels, in display order.
@@ -305,7 +307,7 @@ export default class BattleScene extends Phaser.Scene {
     // this.tracks yet. Deferring until the 'unlocked' event solves both: by the
     // time the player presses any key, the audio context is open and AudioScene
     // is guaranteed to be ready.
-    const trackId = 'battle_' + this.professorId;
+    const trackId = prof.battleMusic;
     if (this.sound.locked) {
       this.sound.once('unlocked', () => {
         this.scene.get('AudioScene').switchTo(trackId);
