@@ -10,9 +10,10 @@ import AudioScene     from './scenes/AudioScene.js';
 
 const config = {
   type:            Phaser.AUTO,   // WebGL if available, Canvas fallback
-  width:           480,
-  height:          320,
+  width:           400,
+  height:          400,
   backgroundColor: '#000000',
+  pixelArt:        true,          // nearest-neighbour filtering; prevents dark fringe on scaled sprites
   scene: [
     // OverworldScene auto-starts first; it launches AudioScene and other scenes.
     OverworldScene,

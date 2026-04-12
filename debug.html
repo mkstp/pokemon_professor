@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Battle Debug — pokemon_professor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0f0f1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+  </style>
+</head>
+<body>
+  <script src="vendor/phaser.min.js"></script>
+  <script type="module">
+    import DebugSelectorScene from './js/scenes/DebugSelectorScene.js';
+    import BattleScene        from './js/scenes/BattleScene.js';
+    import DialogueScene      from './js/scenes/DialogueScene.js';
+    import AudioScene         from './js/scenes/AudioScene.js';
+
+    new Phaser.Game({
+      type:            Phaser.AUTO,
+      width:           400,
+      height:          400,
+      backgroundColor: '#0f0f1a',
+      pixelArt:        true,
+      scene: [
+        // DebugSelectorScene auto-starts first; it launches AudioScene and BattleScene.
+        // It is registered as 'OverworldScene' so BattleScene's endBattle() can wake it.
+        DebugSelectorScene,
+        BattleScene,
+        DialogueScene,
+        AudioScene,
+      ],
+      physics: {
+        default: 'arcade',
+        arcade:  { gravity: { y: 0 }, debug: false },
+      },
+    });
+  </script>
+</body>
+</html>

@@ -466,3 +466,21 @@ test('schwaartz sprite paths point to the l1/l2/l3 files that exist', () => {
   assert.ok(schwaartz.sprites[1].includes('schwaartz_l2'), 'sprites[1] should be the l2 file');
   assert.ok(schwaartz.sprites[2].includes('schwaartz_l3'), 'sprites[2] should be the l3 file');
 });
+
+// ─── AUDIO TRACKS — SFX entries ──────────────────────────────────────────────
+
+test('audioTracks includes the three battle SFX entries', () => {
+  const ids = new Set(audioTracks.map(t => t.id));
+  assert.ok(ids.has('sfx_hit_light'),    'sfx_hit_light missing from audioTracks');
+  assert.ok(ids.has('sfx_hit_heavy'),    'sfx_hit_heavy missing from audioTracks');
+  assert.ok(ids.has('sfx_dialogue_adv'), 'sfx_dialogue_adv missing from audioTracks');
+});
+
+test('SFX audioTracks have loop: false', () => {
+  const sfxIds = ['sfx_hit_light', 'sfx_hit_heavy', 'sfx_dialogue_adv'];
+  for (const id of sfxIds) {
+    const track = audioTracks.find(t => t.id === id);
+    assert.ok(track, `${id} not found in audioTracks`);
+    assert.equal(track.loop, false, `${id} must have loop: false`);
+  }
+});

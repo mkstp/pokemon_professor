@@ -4,7 +4,7 @@
 // battle UI as Phaser GameObjects, handles keyboard input, and resolves
 // move interactions each turn. Returns control to OverworldScene on battle end.
 //
-// Canvas: 480×320 px (defined in game config).
+// Canvas: 400×400 px (defined in game config).
 // Depends on: engine.js (state reads/writes), data.js (professor + move defs)
 
 import * as engine from '../engine.js';
@@ -12,18 +12,18 @@ import { professors, professorMoves, playerMoves } from '../data.js';
 
 // --- Layout constants (canvas pixels) ---
 
-// Battle area occupies the top 195 px; UI panel fills the remaining 125 px.
-const UI_PANEL_Y = 195;
-const UI_PANEL_H = 125;
+// Battle area occupies the top 235 px; UI panel fills the remaining 165 px.
+const UI_PANEL_Y = 235;
+const UI_PANEL_H = 165;
 
 // Professor sprite: front-facing, upper-right.
-const PROF_SPRITE_X     = 348;
-const PROF_SPRITE_Y     =  80;
-const PROF_SPRITE_SCALE = 0.5; // 192 px source → 96 px displayed
+const PROF_SPRITE_X     = 290;
+const PROF_SPRITE_Y     =  95;
+const PROF_SPRITE_SCALE = 1; // 192 px source → displayed at native size
 
 // Player sprite: back-facing, lower-left of the battle area.
-const PLAYER_SPRITE_X     = 128;
-const PLAYER_SPRITE_Y     = 148;
+const PLAYER_SPRITE_X     = 107;
+const PLAYER_SPRITE_Y     = 178;
 const PLAYER_SPRITE_SCALE = 0.5;
 
 // Professor HP info box: top-left of battle area.
@@ -33,11 +33,11 @@ const PROF_HP_BAR_X   = 14;
 const PROF_HP_BAR_Y   = 30;
 
 // Player HP info box: lower-right of battle area.
-const PLAYER_HP_LABEL_X = 272;
-const PLAYER_HP_LABEL_Y = 150;
-const PLAYER_HP_BAR_X   = 272;
-const PLAYER_HP_BAR_Y   = 168;
-const PLAYER_HP_NUM_X   = 412; // x for the "85/100" numbers
+const PLAYER_HP_LABEL_X = 220;
+const PLAYER_HP_LABEL_Y = 190;
+const PLAYER_HP_BAR_X   = 220;
+const PLAYER_HP_BAR_Y   = 208;
+const PLAYER_HP_NUM_X   = 350; // x for the "85/100" numbers
 
 // Shared HP bar dimensions.
 const HP_BAR_W = 168;
@@ -45,23 +45,28 @@ const HP_BAR_H =   8;
 
 // Move menu: stacked vertically in the left half of the UI panel.
 const MOVE_X      =  16;
-const MOVE_Y_BASE = UI_PANEL_Y + 12;
-const MOVE_STEP   =  26; // pixels between each move row
+const MOVE_Y_BASE = UI_PANEL_Y + 14;
+const MOVE_STEP   =  30; // pixels between each move row
 
 // Battle log: same origin as the move menu; appears instead of it during resolve.
 const LOG_X = 14;
-const LOG_Y = UI_PANEL_Y + 10;
+const LOG_Y = UI_PANEL_Y + 12;
 
-// Milliseconds to display a battle log line before advancing to the next step.
-const LINE_DISPLAY_MS = 1200;
 // Duration of an HP bar drain animation (ms).
-const HP_ANIM_MS = 800;
+const HP_ANIM_MS = 1200;
 // Brief pause after an HP animation completes before the next step begins (ms).
-const HP_POST_PAUSE = 400;
+const HP_POST_PAUSE = 500;
 
 // Lookup map: professor move id → move object.
 // Built once at module load so resolveTurn() doesn't scan the array each call.
 const PROF_MOVE_MAP = Object.fromEntries(professorMoves.map(m => [m.id, m]));
+
+// The four moves available to the player in battle, in display order.
+// data.js defines more moves; this list selects and orders the active subset.
+const ACTIVE_MOVE_IDS = ['non_sequitur', 'all_nighter', 'counterexample', 'correction'];
+
+// Top-level action menu labels, in display order.
+const ACTIONS = ['Fight', 'Run', 'Item'];
 
 // ─── Scene ───────────────────────────────────────────────────────────────────
 
@@ -103,32 +108,43 @@ export default class BattleScene extends Phaser.Scene {
   create() {
     const prof = professors.find(p => p.id === this.professorId);
 
+    // Holds the `next` callback for the current dialogue line awaiting player input.
+    // Null when no line is waiting; set by _showLine(), cleared by the advance handler.
+    this._advanceCallback = null;
+
+    // Build the active move list from the ordered subset defined by ACTIVE_MOVE_IDS.
+    const activeMoves = ACTIVE_MOVE_IDS.map(id => playerMoves.find(m => m.id === id));
+
     // battleState is the authoritative source of truth for this scene.
     // Fields beyond the TDD spec handle the full set of move effects in data.js:
     //   professorSkipped  — set by player 'skip' effect
     //   professorHalved   — set by player 'halve_next' effect
     //   deferredDamage    — set by professor 'deferred' effect; applied next professor turn
     //   lastProfessorDamage — used by player 'counter' effect check
+    //   menuLevel         — 'action' (Fight/Run/Item) | 'moves' (move submenu)
+    //   selectedActionIndex — cursor position in the action menu
     this.battleState = {
-      professor:           prof,
-      professorHP:         prof.hp,
-      playerMoves:         playerMoves,
-      selectedMoveIndex:   0,
-      phase:               'select', // 'select' | 'resolve' | 'animating' | 'end' | 'done'
-      outcome:             null,     // null | 'win' | 'loss' | 'fled'
-      disrupted:           false,    // true → player's next move deals half damage
-      professorSkipped:    false,    // true → professor skips their next turn
-      professorHalved:     false,    // true → professor's next move deals half damage
-      deferredDamage:      0,        // HP to deal to player at start of next professor turn
-      lastProfessorDamage: 0,        // last damage the professor dealt (for 'counter' check)
+      professor:            prof,
+      professorHP:          prof.hp,
+      playerMoves:          activeMoves,
+      selectedMoveIndex:    0,
+      menuLevel:            'action', // 'action' | 'moves'
+      selectedActionIndex:  0,
+      phase:                'select', // 'select' | 'resolve' | 'animating' | 'end' | 'done'
+      outcome:              null,     // null | 'win' | 'loss' | 'fled'
+      disrupted:            false,    // true → player's next move deals half damage
+      professorSkipped:     false,    // true → professor skips their next turn
+      professorHalved:      false,    // true → professor's next move deals half damage
+      deferredDamage:       0,        // HP to deal to player at start of next professor turn
+      lastProfessorDamage:  0,        // last damage the professor dealt (for 'counter' check)
     };
 
     // --- Background ---
-    this.add.rectangle(240, 160, 480, 320, 0xffffff);
+    this.add.rectangle(200, 200, 400, 400, 0xffffff);
     // UI panel
-    this.add.rectangle(240, UI_PANEL_Y + UI_PANEL_H / 2, 480, UI_PANEL_H, 0xf0f0f0);
+    this.add.rectangle(200, UI_PANEL_Y + UI_PANEL_H / 2, 400, UI_PANEL_H, 0xf0f0f0);
     // Panel border
-    this.add.rectangle(240, UI_PANEL_Y, 480, 2, 0x888888);
+    this.add.rectangle(200, UI_PANEL_Y, 400, 2, 0x888888);
 
     // --- Battle sprites ---
     // Initial texture: l1 (full-HP level) for multi-level professors, or the
@@ -160,17 +176,39 @@ export default class BattleScene extends Phaser.Scene {
       fontSize: '10px', fill: '#226622', fontFamily: 'monospace',
     });
 
-    // --- Move menu: four Text objects, one per player move ---
-    this.moveTexts = playerMoves.map((_, i) =>
+    // --- Action menu: three Text objects for Fight / Run / Item ---
+    // Shown at the start of each turn. Selecting Fight reveals the move submenu.
+    this.actionTexts = ACTIONS.map((_, i) =>
       this.add.text(MOVE_X, MOVE_Y_BASE + i * MOVE_STEP, '', {
         fontSize: '13px', fill: '#222266', fontFamily: 'monospace',
       })
     );
 
+    // --- Move menu: four Text objects, one per active player move ---
+    // Hidden until the player selects Fight from the action menu.
+    this.moveTexts = activeMoves.map((_, i) =>
+      this.add.text(MOVE_X, MOVE_Y_BASE + i * MOVE_STEP, '', {
+        fontSize: '13px', fill: '#222266', fontFamily: 'monospace',
+      })
+    );
+    this.moveTexts.forEach(t => t.setVisible(false));
+
+    // --- Move description: shown in the right half of the UI panel when the
+    // move submenu is open. Updates dynamically as the cursor moves.
+    this.moveDescText = this.add.text(205, MOVE_Y_BASE, '', {
+      fontSize: '11px', fill: '#443300', fontFamily: 'monospace',
+      wordWrap: { width: 170 },
+    }).setVisible(false);
+
     // --- Battle log: replaces the move menu during turn resolution ---
     this.battleLogText = this.add.text(LOG_X, LOG_Y, '', {
       fontSize: '13px', fill: '#443300', fontFamily: 'monospace',
-      wordWrap: { width: 450 },
+      wordWrap: { width: 370 },
+    }).setVisible(false);
+
+    // Prompt indicator shown while waiting for the player to advance a log line.
+    this.advancePrompt = this.add.text(366, 388, '▼', {
+      fontSize: '12px', fill: '#443300', fontFamily: 'monospace',
     }).setVisible(false);
 
     // --- Keyboard input ---
@@ -185,36 +223,81 @@ export default class BattleScene extends Phaser.Scene {
 
     keys.up.on('down', () => {
       if (this.battleState.phase !== 'select') return;
-      const len = playerMoves.length;
-      this.battleState.selectedMoveIndex =
-        (this.battleState.selectedMoveIndex - 1 + len) % len;
-      this.renderMoveMenu();
+      if (this.battleState.menuLevel === 'action') {
+        this.battleState.selectedActionIndex =
+          (this.battleState.selectedActionIndex - 1 + ACTIONS.length) % ACTIONS.length;
+        this.renderActionMenu();
+      } else {
+        const len = this.battleState.playerMoves.length;
+        this.battleState.selectedMoveIndex =
+          (this.battleState.selectedMoveIndex - 1 + len) % len;
+        this.renderMoveMenu();
+      }
     });
 
     keys.down.on('down', () => {
       if (this.battleState.phase !== 'select') return;
-      this.battleState.selectedMoveIndex =
-        (this.battleState.selectedMoveIndex + 1) % playerMoves.length;
-      this.renderMoveMenu();
+      if (this.battleState.menuLevel === 'action') {
+        this.battleState.selectedActionIndex =
+          (this.battleState.selectedActionIndex + 1) % ACTIONS.length;
+        this.renderActionMenu();
+      } else {
+        const len = this.battleState.playerMoves.length;
+        this.battleState.selectedMoveIndex =
+          (this.battleState.selectedMoveIndex + 1) % len;
+        this.renderMoveMenu();
+      }
     });
 
     const confirmMove = () => {
+      if (this._advanceCallback) {
+        // A battle log line is waiting for player input — advance it.
+        const cb = this._advanceCallback;
+        this._advanceCallback = null;
+        this.advancePrompt.setVisible(false);
+        this.scene.get('AudioScene').play('sfx_dialogue_adv');
+        cb();
+        return;
+      }
       if (this.battleState.phase !== 'select') return;
-      this.selectMove(this.battleState.selectedMoveIndex);
+      if (this.battleState.menuLevel === 'action') {
+        const action = this.battleState.selectedActionIndex;
+        if (action === 0) {
+          // Fight — open the move submenu.
+          this.battleState.menuLevel = 'moves';
+          this._setUIMode('moves');
+          this.renderMoveMenu();
+        } else if (action === 1) {
+          // Run.
+          this.flee();
+        } else {
+          // Item — not yet implemented.
+          this._showNoItems();
+        }
+      } else {
+        this.selectMove(this.battleState.selectedMoveIndex);
+      }
     };
     keys.enter.on('down', confirmMove);
     keys.space.on('down', confirmMove);
 
-    const fleeAction = () => {
+    const backOrFlee = () => {
       if (this.battleState.phase !== 'select') return;
-      this.flee();
+      if (this.battleState.menuLevel === 'moves') {
+        // ESC from move submenu → back to action menu.
+        this.battleState.menuLevel = 'action';
+        this._setUIMode('action');
+        this.renderActionMenu();
+      } else {
+        this.flee();
+      }
     };
-    keys.esc.on('down', fleeAction);
-    keys.r.on('down', fleeAction);
+    keys.esc.on('down', backOrFlee);
+    keys.r.on('down', backOrFlee);
 
     // --- Initial render ---
     this.drawHPBars();
-    this.renderMoveMenu();
+    this.renderActionMenu();
 
     // --- Start battle music ---
     // Browsers block audio until a user gesture has occurred (autoplay policy).
@@ -248,51 +331,80 @@ export default class BattleScene extends Phaser.Scene {
   selectMove(moveIndex) {
     this.battleState.selectedMoveIndex = moveIndex;
     this.battleState.phase = 'resolve';
-    this.moveTexts.forEach(t => t.setVisible(false));
-    this.battleLogText.setVisible(true);
+    this._setUIMode('log');
   }
 
-  // Applies the full turn: player move → professor move. Checks win/loss after
-  // each step. Sets phase to 'animating' on entry to prevent re-entry from
-  // update() while the scene waits to return to 'select'.
+  // Orchestrates the full turn: deferred damage → player move → professor move.
+  // Builds a seq[] of visual steps played back by _runSequence() after all logic
+  // resolves. Sets phase to 'animating' on entry to prevent re-entry from update().
   //
-  // Rather than resolving everything then printing a flat list, this builds a
-  // seq[] of visual steps — text lines and HP bar animations — that are played
-  // back in order by _runSequence(). HP values are captured before each change
-  // so the tween knows the correct from/to range.
+  // ctx bundles the seq array and its three push-helpers (text, animP, animPl) into
+  // a single object passed to each sub-function so they can contribute steps without
+  // needing direct access to the outer seq variable.
   //
   // Note: engine.setPlayerHP(n) resets to 100 when n ≤ 0 (faint/respawn).
-  // Loss conditions are therefore checked against the raw pre-clamp value, not
-  // the post-call engine state.
+  // Loss conditions are therefore checked against the raw pre-clamp value.
   resolveTurn() {
     this.battleState.phase = 'animating'; // prevent re-entry
 
-    const bs   = this.battleState;
-    const move = bs.playerMoves[bs.selectedMoveIndex];
-    const seq  = []; // ordered visual steps: text lines and HP animations
+    const bs  = this.battleState;
+    const seq = []; // ordered visual steps: text lines and HP animations
 
-    const text   = msg     => seq.push(next => this._showLine(msg, next));
-    const animP  = (f, t)  => seq.push(next => this._animateProfHP(f, t, next));
-    const animPl = (f, t)  => seq.push(next => this._animatePlayerHP(f, t, next));
+    const text   = msg    => seq.push(next => this._showLine(msg, next));
+    const animP  = (f, t) => seq.push(next => this._animateProfHP(f, t, next));
+    const animPl = (f, t) => seq.push(next => this._animatePlayerHP(f, t, next));
+
+    const ctx = { bs, seq, text, animP, animPl };
 
     // 1. Apply any deferred professor damage from the previous turn.
-    if (bs.deferredDamage > 0) {
-      const dmg  = bs.deferredDamage;
-      bs.deferredDamage = 0;
-      const fromHP = engine.getState().playerHP;
-      const toHP   = fromHP - dmg;
-      engine.setPlayerHP(toHP);
-      bs.lastProfessorDamage = dmg;
-      text(`The deferred effect hits! You take ${dmg} damage.`);
-      animPl(fromHP, Math.max(0, toHP));
-      if (toHP <= 0) {
-        return this._endSeq(seq, 'loss');
-      }
-    }
+    if (this._applyDeferredDamage(ctx)) return this._endSeq(seq, 'loss');
 
-    // 2. Calculate player move damage.
-    //    'counter': deals 40 damage if the professor's last move dealt ≥ 30.
-    //    'disrupt': player's damage is halved this turn; flag resets after use.
+    // 2-5. Apply player move and check for win/loss.
+    const playerResult = this._applyPlayerMove(ctx);
+    if (playerResult) return this._endSeq(seq, playerResult);
+
+    // 6. Apply professor's turn and check for win/loss.
+    const profResult = this._applyProfessorTurn(ctx);
+    if (profResult) return this._endSeq(seq, profResult);
+
+    // 7. Turn complete — run the visual sequence, then return to the action menu.
+    this._runSequence(seq, () => {
+      bs.phase = 'select';
+      bs.menuLevel = 'action';
+      bs.selectedActionIndex = 0;
+      this._setUIMode('action');
+      this.renderActionMenu();
+    });
+  }
+
+  // Applies any damage deferred from the previous professor turn (deferred effect).
+  // Pushes a text line and player HP animation to ctx.seq.
+  // Returns true if the player faints (loss condition); false otherwise.
+  _applyDeferredDamage({ bs, text, animPl }) {
+    if (bs.deferredDamage <= 0) return false;
+
+    const dmg  = bs.deferredDamage;
+    bs.deferredDamage = 0;
+    const fromHP = engine.getState().playerHP;
+    const toHP   = fromHP - dmg;
+    engine.setPlayerHP(toHP);
+    bs.lastProfessorDamage = dmg;
+    text(`The deferred effect hits! You take ${dmg} damage.`);
+    animPl(fromHP, Math.max(0, toHP));
+
+    return toHP <= 0;
+  }
+
+  // Applies the player's selected move: calculates damage, mutates professorHP,
+  // and handles all player move effects via the effect switch.
+  // Pushes text and HP animation steps to ctx.seq.
+  // Returns 'win' if the professor is defeated, 'loss' if recoil kills the player,
+  // or null if the turn continues.
+  _applyPlayerMove({ bs, text, animP, animPl }) {
+    const move = bs.playerMoves[bs.selectedMoveIndex];
+
+    // 'counter': deals 40 damage if the professor's last move dealt ≥ 30.
+    // 'disrupted': player's damage is halved this turn; flag resets after use.
     let playerDamage = (move.effect === 'counter' && bs.lastProfessorDamage >= 30)
       ? 40
       : move.damage;
@@ -302,13 +414,12 @@ export default class BattleScene extends Phaser.Scene {
       bs.disrupted = false;
     }
 
-    // 3. Apply player damage to professor.
     const fromProfHP = bs.professorHP;
     bs.professorHP   = Math.max(0, bs.professorHP - playerDamage);
     text(`You use ${move.name}! Deals ${playerDamage} damage.`);
     animP(fromProfHP, bs.professorHP);
 
-    // 4. Apply player move effects.
+    // Apply any additional effect from the player move.
     switch (move.effect) {
       case 'skip':
         bs.professorSkipped = true;
@@ -322,7 +433,7 @@ export default class BattleScene extends Phaser.Scene {
         animPl(from, Math.max(0, newHP));
         if (newHP <= 0) {
           text('You fainted from recoil!');
-          return this._endSeq(seq, 'loss');
+          return 'loss';
         }
         break;
       }
@@ -337,78 +448,81 @@ export default class BattleScene extends Phaser.Scene {
       // 'counter' and null require no additional action here.
     }
 
-    // 5. Check win condition (professor HP depleted).
+    // Check win condition (professor HP depleted).
     if (bs.professorHP <= 0) {
       engine.defeatProfessor(this.professorId);
       text(`${bs.professor.name} is defeated! Class passed!`);
-      return this._endSeq(seq, 'win');
+      return 'win';
     }
 
-    // 6. Professor's turn.
+    return null;
+  }
+
+  // Applies the professor's turn: picks a random move and resolves its effect.
+  // Pushes text and HP animation steps to ctx.seq.
+  // Returns 'loss' if the player faints, 'win' if the professor faints from
+  // self_damage recoil, or null if the turn continues normally.
+  _applyProfessorTurn({ bs, text, animP, animPl }) {
     if (bs.professorSkipped) {
       bs.professorSkipped = false;
       text(`${bs.professor.name} is stunned and does nothing.`);
-    } else {
-      const moveIds    = bs.professor.moves;
-      const profMoveId = moveIds[Math.floor(Math.random() * moveIds.length)];
-      const profMove   = PROF_MOVE_MAP[profMoveId];
+      return null;
+    }
 
-      if (profMove.effect === 'deferred') {
-        // Store damage; it will be applied at the start of the next turn.
-        bs.deferredDamage      = profMove.damage;
-        bs.lastProfessorDamage = 0;
-        text(`${bs.professor.name} uses ${profMove.name}. The effect is delayed...`);
-      } else {
-        let profDamage = profMove.damage;
+    const moveIds    = bs.professor.moves;
+    const profMoveId = moveIds[Math.floor(Math.random() * moveIds.length)];
+    const profMove   = PROF_MOVE_MAP[profMoveId];
 
-        // 'halve_next': this professor move deals half damage; flag resets.
-        if (bs.professorHalved) {
-          profDamage         = Math.floor(profDamage / 2);
-          bs.professorHalved = false;
-          text(`${bs.professor.name}'s move is weakened!`);
-        }
+    if (profMove.effect === 'deferred') {
+      // Store damage; it will be applied at the start of the next turn.
+      bs.deferredDamage      = profMove.damage;
+      bs.lastProfessorDamage = 0;
+      text(`${bs.professor.name} uses ${profMove.name}. The effect is delayed...`);
+      return null;
+    }
 
-        text(`${bs.professor.name} uses ${profMove.name}! Deals ${profDamage} damage.`);
+    let profDamage = profMove.damage;
 
-        // Apply player damage and animate the player HP bar.
-        const fromPHP = engine.getState().playerHP;
-        const toPHP   = fromPHP - profDamage;
-        engine.setPlayerHP(toPHP);
-        bs.lastProfessorDamage = profDamage;
-        animPl(fromPHP, Math.max(0, toPHP));
+    // 'halve_next': this professor move deals half damage; flag resets.
+    if (bs.professorHalved) {
+      profDamage         = Math.floor(profDamage / 2);
+      bs.professorHalved = false;
+      text(`${bs.professor.name}'s move is weakened!`);
+    }
 
-        if (profMove.effect === 'disrupt') {
-          bs.disrupted = true;
-          text('Your next move will deal half damage!');
-        } else if (profMove.effect === 'self_damage') {
-          // Professor also takes 25 % recoil.
-          const recoil       = Math.floor(profMove.damage * 0.25);
-          const fromProfHP2  = bs.professorHP;
-          bs.professorHP     = Math.max(0, bs.professorHP - recoil);
-          text(`${bs.professor.name} takes ${recoil} recoil damage.`);
-          animP(fromProfHP2, bs.professorHP);
+    text(`${bs.professor.name} uses ${profMove.name}! Deals ${profDamage} damage.`);
 
-          if (bs.professorHP <= 0) {
-            engine.defeatProfessor(this.professorId);
-            text(`${bs.professor.name} faints from recoil! Class passed!`);
-            return this._endSeq(seq, 'win');
-          }
-        }
+    // Apply player damage and animate the player HP bar.
+    const fromPHP = engine.getState().playerHP;
+    const toPHP   = fromPHP - profDamage;
+    engine.setPlayerHP(toPHP);
+    bs.lastProfessorDamage = profDamage;
+    animPl(fromPHP, Math.max(0, toPHP));
 
-        if (toPHP <= 0) {
-          text('You fainted!');
-          return this._endSeq(seq, 'loss');
-        }
+    if (profMove.effect === 'disrupt') {
+      bs.disrupted = true;
+      text('Your next move will deal half damage!');
+    } else if (profMove.effect === 'self_damage') {
+      // Professor also takes 25 % recoil.
+      const recoil      = Math.floor(profMove.damage * 0.25);
+      const fromProfHP2 = bs.professorHP;
+      bs.professorHP    = Math.max(0, bs.professorHP - recoil);
+      text(`${bs.professor.name} takes ${recoil} recoil damage.`);
+      animP(fromProfHP2, bs.professorHP);
+
+      if (bs.professorHP <= 0) {
+        engine.defeatProfessor(this.professorId);
+        text(`${bs.professor.name} faints from recoil! Class passed!`);
+        return 'win';
       }
     }
 
-    // 7. Turn complete — run the visual sequence, then return to move selection.
-    this._runSequence(seq, () => {
-      bs.phase = 'select';
-      this.battleLogText.setVisible(false);
-      this.moveTexts.forEach(t => t.setVisible(true));
-      this.renderMoveMenu();
-    });
+    if (toPHP <= 0) {
+      text('You fainted!');
+      return 'loss';
+    }
+
+    return null;
   }
 
   // Exits the battle without resolution. The professor is not defeated.
@@ -475,12 +589,45 @@ export default class BattleScene extends Phaser.Scene {
     this.playerHPText.setText(`${Math.max(0, Math.round(hp))}/100`);
   }
 
-  // Updates the four move Text objects to reflect the current selection.
+  // Updates the three action Text objects (Fight / Run / Item) to reflect selection.
+  renderActionMenu() {
+    ACTIONS.forEach((label, i) => {
+      const cursor = i === this.battleState.selectedActionIndex ? '> ' : '  ';
+      this.actionTexts[i].setText(`${cursor}${label}`);
+    });
+  }
+
+  // Updates the four move Text objects to reflect the current selection,
+  // and refreshes the move description shown in the right panel column.
   renderMoveMenu() {
     this.battleState.playerMoves.forEach((move, i) => {
       const cursor = i === this.battleState.selectedMoveIndex ? '> ' : '  ';
       this.moveTexts[i].setText(`${cursor}${move.name}`);
     });
+    this._updateMoveDesc();
+  }
+
+  // Sets moveDescText to the description of the currently highlighted move.
+  _updateMoveDesc() {
+    const move = this.battleState.playerMoves[this.battleState.selectedMoveIndex];
+    this.moveDescText.setText(move.description);
+  }
+
+  // ─── UI mode ──────────────────────────────────────────────────────────────
+
+  // Sets the visibility of all UI panel elements to match the given mode.
+  // Centralises visibility management so callers don't scatter setVisible calls.
+  //   'action' — Fight / Run / Item menu (start of each turn)
+  //   'moves'  — move submenu + description panel (after selecting Fight)
+  //   'log'    — battle log text (during turn resolution)
+  _setUIMode(mode) {
+    const showAction = mode === 'action';
+    const showMoves  = mode === 'moves';
+    const showLog    = mode === 'log';
+    this.actionTexts.forEach(t => t.setVisible(showAction));
+    this.moveTexts.forEach(t => t.setVisible(showMoves));
+    this.moveDescText.setVisible(showMoves);
+    this.battleLogText.setVisible(showLog);
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────
@@ -520,15 +667,22 @@ export default class BattleScene extends Phaser.Scene {
     next();
   }
 
-  // Visual step: display a single log line and wait LINE_DISPLAY_MS before next.
+  // Visual step: display a single log line and wait for the player to press Space/Enter.
+  // The advance handler in create() calls next() and clears _advanceCallback.
   _showLine(msg, next) {
     this.battleLogText.setText(msg);
-    this.time.delayedCall(LINE_DISPLAY_MS, next);
+    this._advanceCallback = next;
+    this.advancePrompt.setVisible(true);
   }
 
   // Visual step: tween the professor HP bar from `from` to `to` over HP_ANIM_MS,
   // then pause HP_POST_PAUSE before calling next.
+  // When damage is dealt (from > to), triggers a sprite flash and hit SFX concurrently.
   _animateProfHP(from, to, next) {
+    if (from > to) {
+      this._flashProfSprite();
+      this._playHitSfx(from - to, this.battleState.professor.hp);
+    }
     this.tweens.addCounter({
       from, to,
       duration:   HP_ANIM_MS,
@@ -540,7 +694,12 @@ export default class BattleScene extends Phaser.Scene {
 
   // Visual step: tween the player HP bar from `from` to `to` over HP_ANIM_MS,
   // then pause HP_POST_PAUSE before calling next.
+  // When damage is dealt (from > to), triggers a camera shake and hit SFX concurrently.
   _animatePlayerHP(from, to, next) {
+    if (from > to) {
+      this.cameras.main.shake(300, 0.008);
+      this._playHitSfx(from - to, 100);
+    }
     this.tweens.addCounter({
       from, to,
       duration:   HP_ANIM_MS,
@@ -548,6 +707,39 @@ export default class BattleScene extends Phaser.Scene {
       onUpdate:   tween => this._drawPlayerHPBar(tween.getValue()),
       onComplete: () => this.time.delayedCall(HP_POST_PAUSE, next),
     });
+  }
+
+  // Briefly displays "You have no items!" in the log area, then returns to the
+  // action menu. Used when the player selects Item with no items available.
+  _showNoItems() {
+    this._setUIMode('log');
+    this.battleLogText.setText('You have no items!');
+    this.time.delayedCall(1200, () => {
+      this._setUIMode('action');
+      this.renderActionMenu();
+    });
+  }
+
+  // Flashes the professor sprite: 3 rapid alpha pulses over ~400ms.
+  // Fire-and-forget — runs concurrently with the HP bar drain tween.
+  _flashProfSprite() {
+    this.tweens.add({
+      targets:    this.professorSprite,
+      alpha:      0.2,
+      duration:   60,
+      yoyo:       true,
+      repeat:     2,
+      ease:       'Linear',
+      onComplete: () => this.professorSprite.setAlpha(1),
+    });
+  }
+
+  // Plays a hit SFX scaled to damage intensity.
+  // Silently no-ops if the SFX file has not been loaded yet.
+  _playHitSfx(damage, maxHP) {
+    if (damage <= 0) return;
+    const id = (damage / maxHP) >= 0.2 ? 'sfx_hit_heavy' : 'sfx_hit_light';
+    this.scene.get('AudioScene').play(id);
   }
 
   // Finalises a turn with a win or loss outcome: sets bs.outcome, runs the

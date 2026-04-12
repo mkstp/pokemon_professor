@@ -280,7 +280,6 @@ export const playerMoves = [
 //   For professors with multi-level art, sprites[] overrides sprite: it lists three
 //   paths in ascending energy order (l1 = full HP, l3 = low HP / most energised).
 //   sprite is still required as a Phaser preload fallback for single-image professors.
-//   TODO: bayesio and vec_tor sprites not yet created — placeholder paths used.
 
 export const professors = [
   {
@@ -321,7 +320,12 @@ export const professors = [
       postWin:   'prof_syntaxa_win',
       postLoss:  'prof_syntaxa_loss',
     },
-    sprite:      'assets/sprites/battle/syntaxa.png',
+    sprite:  'assets/sprites/battle/syntaxa_l1.png',
+    sprites: [
+      'assets/sprites/battle/syntaxa_l1.png',
+      'assets/sprites/battle/syntaxa_l2.png',
+      'assets/sprites/battle/syntaxa_l3.png',
+    ],
     battleMusic: 'battle_prof_syntaxa',
   },
   {
@@ -339,7 +343,12 @@ export const professors = [
       postWin:   'prof_composita_win',
       postLoss:  'prof_composita_loss',
     },
-    sprite:      'assets/sprites/battle/composita.png',
+    sprite:  'assets/sprites/battle/composita_l1.png',
+    sprites: [
+      'assets/sprites/battle/composita_l1.png',
+      'assets/sprites/battle/composita_l2.png',
+      'assets/sprites/battle/composita_l3.png',
+    ],
     battleMusic: 'battle_prof_composita',
   },
   {
@@ -357,7 +366,12 @@ export const professors = [
       postWin:   'prof_recursio_win',
       postLoss:  'prof_recursio_loss',
     },
-    sprite:      'assets/sprites/battle/recursio.png',
+    sprite:  'assets/sprites/battle/recursio_l1.png',
+    sprites: [
+      'assets/sprites/battle/recursio_l1.png',
+      'assets/sprites/battle/recursio_l2.png',
+      'assets/sprites/battle/recursio_l3.png',
+    ],
     battleMusic: 'battle_prof_recursio',
   },
   {
@@ -375,7 +389,12 @@ export const professors = [
       postWin:   'prof_bayesio_win',
       postLoss:  'prof_bayesio_loss',
     },
-    sprite:      'assets/sprites/battle/bayesio.png',   // TODO: sprite not yet created
+    sprite:  'assets/sprites/battle/bayesio_l1.png',
+    sprites: [
+      'assets/sprites/battle/bayesio_l1.png',
+      'assets/sprites/battle/bayesio_l2.png',
+      'assets/sprites/battle/bayesio_l3.png',
+    ],
     battleMusic: 'battle_prof_bayesio',
   },
   {
@@ -393,7 +412,12 @@ export const professors = [
       postWin:   'prof_vec_tor_win',
       postLoss:  'prof_vec_tor_loss',
     },
-    sprite:      'assets/sprites/battle/vec_tor.png',   // TODO: sprite not yet created
+    sprite:  'assets/sprites/battle/vec_tor_l1.png',
+    sprites: [
+      'assets/sprites/battle/vec_tor_l1.png',
+      'assets/sprites/battle/vec_tor_l2.png',
+      'assets/sprites/battle/vec_tor_l3.png',
+    ],
     battleMusic: 'battle_prof_vec_tor',
   },
 ];
@@ -714,6 +738,12 @@ export const audioTracks = [
   // Post-battle jingles — short, no loop
   { id: 'victory', src: 'assets/music/victory.mp3', loop: false },  // TODO: file not yet sourced
   { id: 'defeat',  src: 'assets/music/defeat.mp3',  loop: false },  // TODO: file not yet sourced
+
+  // Battle SFX — short, no loop. Files must be placed in assets/sfx/.
+  // TODO: source and add hit_light.mp3, hit_heavy.mp3, dialogue_adv.mp3
+  { id: 'sfx_hit_light',    src: 'assets/sfx/hit_light.mp3',    loop: false },
+  { id: 'sfx_hit_heavy',    src: 'assets/sfx/hit_heavy.mp3',    loop: false },
+  { id: 'sfx_dialogue_adv', src: 'assets/sfx/dialogue_adv.mp3', loop: false },
 ];
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
