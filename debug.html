@@ -5,7 +5,7 @@
   <title>Battle Debug — pokemon_professor</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0f0f1a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    body { background: #0f0f1a; display: flex; justify-content: center; align-items: flex-start; padding-top: 20px; min-height: 100vh; }
   </style>
 </head>
 <body>
@@ -19,7 +19,7 @@
     new Phaser.Game({
       type:            Phaser.AUTO,
       width:           400,
-      height:          400,
+      height:          900, // extended to fit 15 student NPC rows in the right column
       backgroundColor: '#0f0f1a',
       pixelArt:        true,
       scene: [

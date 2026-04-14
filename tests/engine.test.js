@@ -4,7 +4,7 @@
 
 import { test, assert } from './runner.js';
 import * as engine from '../js/engine.js';
-import { professors } from '../js/data.js';
+import { professors } from '../js/data/professors.js';
 
 // IDs of all professors who must be defeated before the castle unlocks.
 // Mirrors the PRE_CASTLE_PROFESSOR_IDS slice in engine.js (all except the last).

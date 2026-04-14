@@ -1,13 +1,30 @@
-# TDD: Data
+# TDD: Data Layer
 
-**File:** `js/data.js`
+**Directory:** `js/data/`
 **Depends on:** none
 
 ---
 
 ## Responsibility
 
-Defines and exports all static game data: professors, player moves, dialogue sequences, map regions, and audio tracks. Contains no logic. All other modules import from `data.js`; none write back to it.
+Defines and exports all static game data. Contains no logic. All other modules import directly from the domain file that owns the data they need; no barrel or index file exists.
+
+The data layer is split into domain files for LLM-context efficiency. Each file is self-contained and independently loadable. Consumers are updated to import from the specific file rather than a monolithic `data.js`.
+
+---
+
+## Files
+
+| File | Exports | Consumed by |
+|------|---------|-------------|
+| `professors.js` | `professorMoves`, `professors` | `BattleScene`, `DebugSelectorScene`, `engine` |
+| `playerMoves.js` | `playerMoves` | `BattleScene` |
+| `students.js` | `npcMoves`, `studentNPCs` | `BattleScene` |
+| `ambientNpcs.js` | `ambientNPCs` | `OverworldScene` |
+| `items.js` | `items` | `BattleScene`, overworld item interactions |
+| `regions.js` | `TILE`, `regions` | `engine`, `OverworldScene` |
+| `dialogue.js` | `dialogueSequences` | `DialogueScene` |
+| `audio.js` | `audioTracks` | `AudioScene` |
 
 ---
 
@@ -17,19 +34,19 @@ Defines and exports all static game data: professors, player moves, dialogue seq
 
 ```js
 {
-  id: string,           // unique identifier (e.g. 'prof_phonetics')
-  name: string,         // display name (e.g. 'Professor Aldridge')
+  id: string,           // unique identifier (e.g. 'prof_schwaartz')
+  name: string,         // display name shown in battle UI
   field: string,        // academic field label shown in battle UI
   hp: number,           // starting HP
   location: {
-    region: string,     // region id where encounter trigger lives
-    tile: { x: number, y: number }, // encounter trigger tile coordinates
+    region: string,     // region id where the encounter tile lives
+    tile: { x: number, y: number },
   },
-  moves: array,         // array of Move ids this professor can use (see Move)
+  moves: string[],      // array of Move ids drawn from professorMoves
   dialogue: {
-    preBattle: string,  // key into dialogueSequences for pre-battle sequence
-    postWin: string,    // key into dialogueSequences for post-battle win
-    postLoss: string,   // key into dialogueSequences for post-battle loss
+    preBattle: string,  // key into dialogueSequences
+    postWin: string,    // key into dialogueSequences
+    postLoss: string,   // key into dialogueSequences
   },
   sprite: string,       // path to professor sprite sheet
 }
@@ -39,15 +56,107 @@ Defines and exports all static game data: professors, player moves, dialogue seq
 
 ### Move
 
+Shared schema. Used for professor moves (`professorMoves`), player moves (`playerMoves`), and NPC moves (`npcMoves`). Effects are described from the perspective of the move's user.
+
 ```js
 {
   id: string,           // unique identifier (e.g. 'minimal_pair')
   name: string,         // display name in battle UI
-  damage: number,       // fixed HP damage dealt to target
+  damage: number,       // fixed HP damage dealt to the opponent; 0 for effect-only moves
   description: string,  // one-line description shown in move selection UI
-  effect: string|null,  // optional: 'disrupt' | 'self_damage' | 'deferred' (see Battle TDD for effect logic)
+  effect: string|null,  // see Effect Reference below
 }
 ```
+
+**Effect Reference** — values used in `effect`:
+
+| Value | Behaviour |
+|-------|-----------|
+| `null` | No secondary effect. |
+| `'disrupt'` | Opponent's next move deals half damage. |
+| `'self_damage'` | User takes 25% of the damage dealt as recoil. |
+| `'deferred'` | Damage stored; applied at start of user's next turn. |
+| `'skip_opponent'` | Opponent skips their next action. |
+| `'skip_self_2'` | User skips next two turns. |
+| `'heal'` | User restores HP; value specified in `healAmount`. |
+| `'conditional_damage'` | Damage varies based on context; condition specified in `condition`. |
+| `'reveal_next'` | Opponent's next selected move is revealed to the user. |
+| `'clear_buffs'` | Removes opponent's active buff modifiers. |
+| `'nullify_last_buff'` | Negates opponent's most recent buff. |
+| `'boost_next'` | User's next move deals bonus damage; value specified in `bonusAmount`. |
+| `'double_next'` | User's next move deals double damage. |
+| `'priority'` | User acts first regardless of turn order next round. |
+| `'swap_effect'` | Applies last used move's effect to the next move. |
+
+> **TDD note:** The full effect list will expand as moves are implemented. Effects not yet implemented are stubs — the battle engine resolves unknown effects as `null` during development and logs a warning.
+
+---
+
+### StudentNPC
+
+Battle-capable student characters. Encountered in the overworld; trigger a battle on interaction.
+
+```js
+{
+  id: string,           // unique identifier (e.g. 'student_halvorsen')
+  name: string,         // display name
+  hp: number,           // starting HP (TBD — requires balancing pass)
+  moves: string[],      // array of Move ids drawn from npcMoves
+  dialogue: {
+    preBattle: string,  // key into dialogueSequences
+    postWin: string,    // key into dialogueSequences (player wins)
+    postLoss: string,   // key into dialogueSequences (player loses)
+    reward?: string,    // key into dialogueSequences; only present if NPC gives a reward on defeat
+  },
+  reward?: string,      // item id given to the player on defeat; omit if no reward
+  sprite: string,       // path to NPC sprite sheet (TBD)
+}
+```
+
+> **TDD note:** HP values for student NPCs are TBD pending a balancing pass against professor HP. Sprite paths are TBD.
+
+---
+
+### AmbientNPC
+
+Non-battle NPCs encountered in the overworld. Interaction triggers dialogue and optionally gives an item.
+
+```js
+{
+  id: string,           // unique identifier (e.g. 'npc_casey')
+  name: string,         // display name
+  location: {
+    region: string,
+    tile: { x: number, y: number },
+  },
+  dialogue: string[],   // ordered array of dialogue lines (no speaker object — NPC always speaks)
+  reward?: string,      // item id given on interaction; omit if no reward
+  repeatableReward: boolean, // true = item is given each time player interacts
+}
+```
+
+---
+
+### Item
+
+Items carried in the player's inventory. Two categories: consumable (single-use) and persistent (key items, upgrades, badges). Distinguished by `category`.
+
+```js
+{
+  id: string,           // unique identifier (e.g. 'triscuit')
+  name: string,         // display name
+  flavourText: string|null,
+  category: 'consumable' | 'key_item' | 'upgrade' | 'badge',
+  effect: {
+    action: 'restore_hp' | 'boost_attack' | 'boost_exp' | 'boost_defense' | 'unlock' | 'none',
+    value: number|null, // null = TBD (requires balancing pass)
+  },
+  source: string|null,  // NPC id or free-text location description; null if not yet assigned
+  repeatableSource: boolean, // true = source gives this item on every interaction
+}
+```
+
+> **TDD note:** `effect.value` for most consumable HP restoration is TBD pending a balancing pass. The `unlock` action applies to key items only; the engine checks the player's inventory for the relevant key item id when attempting locked transitions or interactions.
 
 ---
 
@@ -55,7 +164,7 @@ Defines and exports all static game data: professors, player moves, dialogue seq
 
 ```js
 [
-  { speaker: string, line: string },  // ordered array of speaker + line pairs
+  { speaker: string, line: string },
   ...
 ]
 ```
@@ -64,10 +173,10 @@ Stored as a flat object keyed by sequence id:
 
 ```js
 dialogueSequences = {
-  'prof_phonetics_pre':  [ ... ],
-  'prof_phonetics_win':  [ ... ],
-  'prof_phonetics_loss': [ ... ],
-  // ... one entry per professor per trigger point
+  'prof_schwaartz_pre':  [ ... ],
+  'prof_schwaartz_win':  [ ... ],
+  'prof_schwaartz_loss': [ ... ],
+  // one entry per professor and student NPC per trigger point
 }
 ```
 
@@ -77,14 +186,30 @@ dialogueSequences = {
 
 ```js
 {
-  id: string,             // unique identifier (e.g. 'outdoor', 'main_building')
+  id: string,             // unique identifier (e.g. 'outdoor_campus')
   displayName: string,    // shown in UI on region entry
-  tileMap: array,         // 2D array of tile ids defining the region layout
-  entryPosition: { x: number, y: number }, // default player position on entry
-  connections: array,     // array of { tile: {x,y}, targetRegion: string, targetTile: {x,y} }
-  weatherEffect: string|null, // effect id applied in this region ('rain' | 'monitor_glow' | etc.)
-  music: string,          // track id to play in this region's overworld
-  encounterTiles: array,  // array of { tile: {x,y}, professorId: string }
+  tileMap: number[][],    // 2D array of TILE constants — row-major, indexed tileMap[y][x]
+  entryPosition: { x: number, y: number },
+  connections: [          // tile transitions to other regions
+    { tile: {x,y}, targetRegion: string, targetTile: {x,y} },
+    ...
+  ],
+  weatherEffect: string|null, // 'rain' | 'monitor_glow' | etc.
+  music: string,          // audioTrack id
+  encounterTiles: [       // tiles that trigger a professor encounter
+    { tile: {x,y}, professorId: string },
+    ...
+  ],
+}
+```
+
+**TILE constants** (exported from `regions.js`):
+
+```js
+TILE = {
+  FLOOR: 0,  // walkable
+  WALL:  1,  // impassable obstacle
+  WATER: 2,  // impassable; rendered as water
 }
 ```
 
@@ -96,39 +221,20 @@ dialogueSequences = {
 {
   id: string,     // unique identifier (e.g. 'overworld', 'battle', 'victory')
   src: string,    // path to audio file
-  loop: boolean,  // whether the track loops
+  loop: boolean,
 }
 ```
-
----
-
-## Functions
-
-### init()
-
-- **Does:** No-op — all data is defined at module load time as constants. Exported to satisfy callers that call `init()` on every module; has no effect.
-- **Inputs:** none
-- **Returns:** void
-- **Side effects:** none
-
----
-
-## Exports
-
-`data.js` exports the following named constants. All are defined inline — no fetch or async loading in the proof-of-concept.
-
-| Export | Type | Contents |
-|--------|------|----------|
-| `professors` | array | All six Professor objects, ordered by encounter sequence |
-| `playerMoves` | array | All player Move objects |
-| `professorMoves` | array | All professor Move objects |
-| `dialogueSequences` | object | All DialogueSequence arrays, keyed by sequence id |
-| `regions` | object | All Region objects, keyed by region id |
-| `audioTracks` | array | All AudioTrack objects |
 
 ---
 
 ## Module Interfaces
 
 **Reads from:** none
-**Exposes to:** `engine` (region entry positions), `OverworldScene` (region definitions, encounter tiles), `BattleScene` (professor stats, moves), `DialogueScene` (dialogue sequences), `AudioScene` (track definitions)
+
+**Exposes to:**
+- `engine` — `regions`, `professors`
+- `OverworldScene` — `regions`, `ambientNPCs`
+- `BattleScene` — `professors`, `professorMoves`, `playerMoves`, `studentNPCs`, `npcMoves`, `items`
+- `DialogueScene` — `dialogueSequences`
+- `AudioScene` — `audioTracks`
+- `DebugSelectorScene` — `professors`

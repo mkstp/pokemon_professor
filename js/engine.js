@@ -4,10 +4,10 @@
 // state by calling functions exported from this module. No module modifies
 // gameState directly.
 //
-// Depends on: data.js (regions for entry positions, professors for the
-//             allProfessorsDefeated check)
+// Depends on: data/regions.js (entry positions), data/professors.js (defeat check)
 
-import { regions, professors } from './data.js';
+import { regions }    from './data/regions.js';
+import { professors } from './data/professors.js';
 
 // The five professors who must be defeated to unlock the castle.
 // Excludes both the final boss (prof_vec_tor) and the secret boss (prof_parsemore),

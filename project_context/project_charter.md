@@ -25,7 +25,7 @@ pokemon_professor is a standalone browser game built with HTML/CSS/JavaScript. T
 - Weather animations in the overworld (e.g. rain, wind)
 - Retro pixel art visual style throughout
 - Proof-of-concept target: one fully playable end-to-end loop
-- Flat, explicit code structure — logic reads linearly; no patterns or abstractions that require architectural knowledge to follow
+- Two-layer code structure with explicit separation: the *data layer* (`js/data/`) is split into domain files (professors, moves, regions, dialogue, etc.) for LLM-context efficiency — each file exports self-contained static data with no logic. The *logic layer* remains flat and non-modular: scene files, engine, and game logic read linearly with no abstractions requiring architectural knowledge. All import paths are explicit; no barrel files or index re-exports exist.
 - Inline comments throughout explaining the purpose of non-obvious logic
 - **Phaser 3** is the sole approved external library. Vetted on three criteria: (1) necessity — it handles tile rendering, scene management, input, audio, and the game loop, eliminating five categories of manual implementation; (2) documentation quality — comprehensive official documentation and active community; (3) net complexity — it reduces rather than adds complexity for a non-specialist reader, provided the Phaser Scene lifecycle (preload / create / update) is explained once in DESIGN.md. Loaded as a local file; no CDN dependency, no build step. All other external library inclusions remain prohibited unless vetted by the same criteria.
 

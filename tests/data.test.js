@@ -1,17 +1,16 @@
-// tests/data.test.js — test suite for js/data.js
+// tests/data.test.js — test suite for the js/data/ module group
 // Covers: structural completeness, referential integrity, and value constraints.
-// All tests are synchronous (data.js contains no async operations).
+// All tests are synchronous (data files contain no async operations).
 
 import { test, assert } from './runner.js';
-import {
-  TILE,
-  professorMoves,
-  playerMoves,
-  professors,
-  dialogueSequences,
-  regions,
-  audioTracks,
-} from '../js/data.js';
+import { professorMoves, professors }  from '../js/data/professors.js';
+import { playerMoves }                 from '../js/data/playerMoves.js';
+import { npcMoves, studentNPCs }       from '../js/data/students.js';
+import { ambientNPCs }                 from '../js/data/ambientNpcs.js';
+import { items }                       from '../js/data/items.js';
+import { TILE, regions }               from '../js/data/regions.js';
+import { dialogueSequences }           from '../js/data/dialogue.js';
+import { audioTracks }                 from '../js/data/audio.js';
 
 // ─── TILE CONSTANTS ───────────────────────────────────────────────────────────
 
@@ -483,4 +482,188 @@ test('SFX audioTracks have loop: false', () => {
     assert.ok(track, `${id} not found in audioTracks`);
     assert.equal(track.loop, false, `${id} must have loop: false`);
   }
+});
+
+// ─── NPC MOVES — structure ────────────────────────────────────────────────────
+
+test('npcMoves is a non-empty array', () => {
+  assert.isArray(npcMoves);
+  assert.ok(npcMoves.length > 0, 'npcMoves is empty');
+});
+
+test('every npcMove has required fields', () => {
+  const required = ['id', 'name', 'damage', 'description', 'effect'];
+  for (const move of npcMoves) {
+    for (const field of required) {
+      assert.ok(field in move, `npcMove "${move.id ?? '?'}" missing field "${field}"`);
+    }
+  }
+});
+
+test('every npcMove damage is a non-negative integer', () => {
+  for (const move of npcMoves) {
+    assert.ok(
+      Number.isInteger(move.damage) && move.damage >= 0,
+      `npcMove "${move.id}" damage must be a non-negative integer, got ${move.damage}`
+    );
+  }
+});
+
+test('npcMove ids are unique', () => {
+  const ids = npcMoves.map(m => m.id);
+  const unique = new Set(ids);
+  assert.equal(unique.size, ids.length, 'duplicate npcMove ids found');
+});
+
+test('npcMoves with heal effects have a positive integer healAmount', () => {
+  const healEffects = new Set(['heal', 'heal_and_reduce_next', 'heal_and_shield']);
+  for (const move of npcMoves) {
+    if (healEffects.has(move.effect)) {
+      assert.ok(
+        Number.isInteger(move.healAmount) && move.healAmount > 0,
+        `npcMove "${move.id}" has effect "${move.effect}" but missing healAmount`
+      );
+    }
+  }
+});
+
+// ─── STUDENT NPCs — structure ─────────────────────────────────────────────────
+
+test('studentNPCs is a non-empty array', () => {
+  assert.isArray(studentNPCs);
+  assert.ok(studentNPCs.length > 0, 'studentNPCs is empty');
+});
+
+test('every studentNPC has required fields', () => {
+  const required = ['id', 'name', 'hp', 'moves', 'dialogue', 'sprite'];
+  for (const npc of studentNPCs) {
+    for (const field of required) {
+      assert.ok(field in npc, `studentNPC "${npc.id ?? '?'}" missing field "${field}"`);
+    }
+  }
+});
+
+test('every studentNPC hp is a positive integer', () => {
+  for (const npc of studentNPCs) {
+    assert.ok(
+      Number.isInteger(npc.hp) && npc.hp > 0,
+      `studentNPC "${npc.id}" hp must be a positive integer, got ${npc.hp}`
+    );
+  }
+});
+
+test('every studentNPC dialogue has preBattle, postWin, postLoss keys', () => {
+  for (const npc of studentNPCs) {
+    const d = npc.dialogue;
+    assert.ok(typeof d.preBattle === 'string', `studentNPC "${npc.id}" missing dialogue.preBattle`);
+    assert.ok(typeof d.postWin   === 'string', `studentNPC "${npc.id}" missing dialogue.postWin`);
+    assert.ok(typeof d.postLoss  === 'string', `studentNPC "${npc.id}" missing dialogue.postLoss`);
+  }
+});
+
+test('every studentNPC move id exists in npcMoves', () => {
+  const knownIds = new Set(npcMoves.map(m => m.id));
+  for (const npc of studentNPCs) {
+    for (const moveId of npc.moves) {
+      assert.ok(
+        knownIds.has(moveId),
+        `studentNPC "${npc.id}" references unknown npcMove id "${moveId}"`
+      );
+    }
+  }
+});
+
+test('every studentNPC reward item id exists in items', () => {
+  const knownItemIds = new Set(items.map(i => i.id));
+  for (const npc of studentNPCs) {
+    if (npc.reward !== undefined) {
+      assert.ok(
+        knownItemIds.has(npc.reward),
+        `studentNPC "${npc.id}" reward references unknown item id "${npc.reward}"`
+      );
+    }
+  }
+});
+
+// ─── AMBIENT NPCs — structure ─────────────────────────────────────────────────
+
+test('ambientNPCs is a non-empty array', () => {
+  assert.isArray(ambientNPCs);
+  assert.ok(ambientNPCs.length > 0, 'ambientNPCs is empty');
+});
+
+test('every ambientNPC has required fields', () => {
+  const required = ['id', 'name', 'location', 'dialogue', 'repeatableReward'];
+  for (const npc of ambientNPCs) {
+    for (const field of required) {
+      assert.ok(field in npc, `ambientNPC "${npc.id ?? '?'}" missing field "${field}"`);
+    }
+  }
+});
+
+test('every ambientNPC dialogue is a non-empty array of strings', () => {
+  for (const npc of ambientNPCs) {
+    assert.isArray(npc.dialogue, `ambientNPC "${npc.id}" dialogue must be an array`);
+    assert.ok(npc.dialogue.length > 0, `ambientNPC "${npc.id}" dialogue is empty`);
+    for (let i = 0; i < npc.dialogue.length; i++) {
+      assert.ok(
+        typeof npc.dialogue[i] === 'string' && npc.dialogue[i].length > 0,
+        `ambientNPC "${npc.id}" dialogue[${i}] must be a non-empty string`
+      );
+    }
+  }
+});
+
+test('every ambientNPC reward item id exists in items', () => {
+  const knownItemIds = new Set(items.map(i => i.id));
+  for (const npc of ambientNPCs) {
+    if (npc.reward !== undefined) {
+      assert.ok(
+        knownItemIds.has(npc.reward),
+        `ambientNPC "${npc.id}" reward references unknown item id "${npc.reward}"`
+      );
+    }
+  }
+});
+
+// ─── ITEMS — structure ────────────────────────────────────────────────────────
+
+test('items is a non-empty array', () => {
+  assert.isArray(items);
+  assert.ok(items.length > 0, 'items is empty');
+});
+
+test('every item has required fields', () => {
+  const required = ['id', 'name', 'category', 'effect'];
+  for (const item of items) {
+    for (const field of required) {
+      assert.ok(field in item, `item "${item.id ?? '?'}" missing field "${field}"`);
+    }
+  }
+});
+
+test('every item category is from the allowed set', () => {
+  const allowed = new Set(['consumable', 'key_item', 'upgrade', 'badge']);
+  for (const item of items) {
+    assert.ok(
+      allowed.has(item.category),
+      `item "${item.id}" has unexpected category "${item.category}"`
+    );
+  }
+});
+
+test('every item effect.action is from the allowed set', () => {
+  const allowed = new Set(['restore_hp', 'boost_attack', 'boost_exp', 'boost_defense', 'unlock', 'none']);
+  for (const item of items) {
+    assert.ok(
+      allowed.has(item.effect.action),
+      `item "${item.id}" has unexpected effect.action "${item.effect.action}"`
+    );
+  }
+});
+
+test('item ids are unique', () => {
+  const ids = items.map(i => i.id);
+  const unique = new Set(ids);
+  assert.equal(unique.size, ids.length, 'duplicate item ids found');
 });

@@ -6,7 +6,7 @@
 //
 // Depends on: data.js (audioTracks array for ids, file paths, and loop settings)
 
-import { audioTracks } from '../data.js';
+import { audioTracks } from '../data/audio.js';
 
 export default class AudioScene extends Phaser.Scene {
   constructor() {
