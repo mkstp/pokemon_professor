@@ -3,12 +3,12 @@
 // Registered under the key 'OverworldScene' so that BattleScene.endBattle()
 // can wake it without modification. Displays a two-column selector:
 //   Left column  — professors (7 entries, pass { opponentType: 'professor' })
-//   Right column — student NPCs (15 entries, pass { opponentType: 'student' })
+//   Right column — student NPCs (8 per page, paginated with Prev/Next nav)
 //
 // After a battle ends, BattleScene stops itself and wakes 'OverworldScene'
 // (this scene), which rebuilds the selector so the next battle can be chosen.
 //
-// Canvas: 400×900 px (debug.html sets height: 900 to fit all 15 student rows).
+// Canvas: 400×900 px.
 
 import * as engine from '../engine.js';
 import { professors } from '../data/professors.js';
@@ -29,6 +29,9 @@ const BTN_H   =  38;
 const BTN_Y0  =  72; // y-centre of first button in each column
 const BTN_GAP =  50; // spacing between button centres
 
+// Student pagination
+const STUDS_PER_PAGE = 8;
+
 export default class DebugSelectorScene extends Phaser.Scene {
   constructor() {
     super({ key: 'OverworldScene' }); // key must match BattleScene's wake/stop calls
@@ -36,15 +39,30 @@ export default class DebugSelectorScene extends Phaser.Scene {
 
   // First run: launch AudioScene once and build the initial UI.
   create() {
+    this._studPage = 0;
     engine.init();
     this.scene.launch('AudioScene');
+    // AudioScene.create() populates this.tracks asynchronously after preload completes.
+    // Listening on its 'create' event guarantees tracks are ready before we try to play.
+    this.scene.get('AudioScene').events.once('create', () => {
+      if (this.sound.locked) {
+        this.sound.once('unlocked', () => {
+          this.scene.get('AudioScene').switchTo('intro_credits');
+        });
+      } else {
+        this.scene.get('AudioScene').switchTo('intro_credits');
+      }
+    });
     this._buildUI();
   }
 
   // Called by BattleScene.endBattle() after each battle completes.
   // Resets engine state so the next battle starts at full HP.
   wake() {
+    this._studPage = 0;
     engine.init();
+    const audio = this.scene.get('AudioScene');
+    if (audio) audio.switchTo('intro_credits');
     this._buildUI();
   }
 
@@ -81,14 +99,34 @@ export default class DebugSelectorScene extends Phaser.Scene {
       );
     });
 
-    // Student NPC buttons (right column, data order)
-    studentNPCs.forEach((npc, i) => {
+    // Student NPC buttons (right column, current page only)
+    const pageStart  = this._studPage * STUDS_PER_PAGE;
+    const pageSlice  = studentNPCs.slice(pageStart, pageStart + STUDS_PER_PAGE);
+    const totalPages = Math.ceil(studentNPCs.length / STUDS_PER_PAGE);
+
+    pageSlice.forEach((npc, i) => {
+      const globalIndex = pageStart + i; // 0-based index across all students
       const y = BTN_Y0 + i * BTN_GAP;
       this._makeButton(STUD_COL_X, y, STUD_BTN_W, BTN_H, npc.name,
-        `${npc.hp} HP`, `#${i + 1}`,
+        `${npc.hp} HP`, `#${globalIndex + 1}`,
         () => this._startBattle({ opponentType: 'student', studentId: npc.id })
       );
     });
+
+    // Page indicator
+    this.add.text(STUD_COL_X, 500, `${this._studPage + 1} / ${totalPages}`, {
+      fontSize: '11px', color: '#8888aa', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    // Prev / Next navigation buttons
+    if (this._studPage > 0) {
+      this._makeNavButton(STUD_COL_X - 44, 540, 'Prev',
+        () => { this._studPage -= 1; this._buildUI(); });
+    }
+    if (this._studPage < totalPages - 1) {
+      this._makeNavButton(STUD_COL_X + 44, 540, 'Next',
+        () => { this._studPage += 1; this._buildUI(); });
+    }
   }
 
   // Creates a clickable button with a title, subtitle, and index label.
@@ -108,6 +146,23 @@ export default class DebugSelectorScene extends Phaser.Scene {
     this.add.text(x + w / 2 - 6, y, indexLabel, {
       fontSize: '9px', color: '#555577', fontFamily: 'monospace',
     }).setOrigin(1, 0.5);
+
+    bg.on('pointerover',  () => bg.setFillStyle(0x3a3a6a));
+    bg.on('pointerout',   () => bg.setFillStyle(0x2a2a4a));
+    bg.on('pointerdown',  onClick);
+  }
+
+  // Creates a simple navigation button (no subtitle or index label).
+  // Used for Prev / Next pagination controls in the student column.
+  _makeNavButton(x, y, label, onClick) {
+    const w  = 76;
+    const h  = BTN_H;
+    const bg = this.add.rectangle(x, y, w, h, 0x2a2a4a)
+      .setInteractive({ useHandCursor: true });
+
+    this.add.text(x, y, label, {
+      fontSize: '12px', color: '#ccccff', fontFamily: 'monospace',
+    }).setOrigin(0.5);
 
     bg.on('pointerover',  () => bg.setFillStyle(0x3a3a6a));
     bg.on('pointerout',   () => bg.setFillStyle(0x2a2a4a));

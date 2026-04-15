@@ -848,8 +848,10 @@ export default class BattleScene extends Phaser.Scene {
         },
       });
     } else {
-      // Student battle win, loss, or fled: return to overworld immediately.
-      audio.switchTo('overworld');
+      // Student NPC battle end: stop battle music and return to the debug selector.
+      // DebugSelectorScene.wake() is responsible for starting intro_credits.
+      // Do not call switchTo('overworld') here — the debug selector is not the overworld.
+      audio.stop();
       this.scene.stop('BattleScene');
       this.scene.wake('OverworldScene');
     }

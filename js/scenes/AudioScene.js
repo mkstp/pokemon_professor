@@ -24,8 +24,11 @@ export default class AudioScene extends Phaser.Scene {
   }
 
   // Adds all loaded audio as sound instances and marks this scene as persistent.
+  // Skips any track whose file failed to load (404 etc.) so a missing asset
+  // cannot break the loop and leave later tracks unregistered.
   create() {
     for (const track of audioTracks) {
+      if (!this.cache.audio.has(track.id)) continue;
       this.tracks[track.id] = this.sound.add(track.id, { loop: track.loop });
     }
 

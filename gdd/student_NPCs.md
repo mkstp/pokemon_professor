@@ -49,7 +49,7 @@ Special Move — "Room Booking Rant": 18 damage; 50% chance to delay player (ski
 
 ---
 
-### Voss
+### Voss (PHD Zombie)
 
 **Before Battle:**
 "That's not right. I can already tell."
@@ -68,7 +68,7 @@ Moveset: Correction, Counterexample, Citation Needed, Deadline Panic
 
 ---
 
-### Lab Sentinel K
+### Lab Sentinel K (PHD Zombie)
 
 **Before Battle:**
 "You weren't invited to be here."
@@ -108,7 +108,7 @@ Special Move — "Question!": 10 damage (up to 3 times); deals damage, then wait
 
 ---
 
-### Simon
+### Simon (PHD Zombie)
 
 **Before Battle:**
 "My advisor really sucks..."
@@ -410,7 +410,7 @@ Noam Vowel (obsessed with how things are pronounced)
 
 Ambient
 Pixi (nerdy, loves video games, a little shy)
-Kalea (colorful clothing and free flowing personality)
+Kleo (colorful clothing and free flowing personality)
 
 ## Move Pool
 

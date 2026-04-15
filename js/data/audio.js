@@ -5,13 +5,13 @@
 // All tracks the game may play.
 // id is used by audio.js to look up and play a track.
 // Per-professor battle tracks follow the convention 'battle_<professorId>'.
-//
-// TODO: vec_tor has no dedicated battle track yet — castle theme used as placeholder.
-//       Replace src with 'assets/music/vec_tor.mp3' once the track is created.
 // TODO: victory and defeat jingles not yet sourced — placeholder paths used.
 //       Sourcing these is tracked as an open issue.
 
 export const audioTracks = [
+
+  // Title / debug screen track
+  { id: 'intro_credits', src: 'assets/music/intro_credits.mp3', loop: true },
 
   // Overworld and ambient tracks
   { id: 'overworld',  src: 'assets/music/overworld.mp3',  loop: true  },
@@ -19,6 +19,9 @@ export const audioTracks = [
   { id: 'cafeteria',  src: 'assets/music/cafeteria.mp3',  loop: true  },
   { id: 'dungeon',    src: 'assets/music/dungeon.mp3',    loop: true  },
   { id: 'castle',     src: 'assets/music/castle.mp3',     loop: true  },
+
+  // Default battle track — used for student NPC battles and any professor without a dedicated track
+  { id: 'battle_default', src: 'assets/music/battle_default.mp3', loop: true },
 
   // Per-professor battle tracks
   { id: 'battle_prof_schwaartz', src: 'assets/music/schwaartz.mp3',  loop: true },
