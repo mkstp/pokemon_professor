@@ -11,6 +11,9 @@ import './phaser-stub.js';
 import { test, assert } from './runner.js';
 import BattleScene from '../js/scenes/BattleScene.js';
 import * as engine from '../js/engine.js';
+import { professorMoves } from '../js/data/professors.js';
+import { npcMoves }       from '../js/data/students.js';
+import { playerMoves }    from '../js/data/playerMoves.js';
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
@@ -632,4 +635,402 @@ test('_applyOpponentTurn: clear_buffs clears disrupted and playerReducedNext10',
 
   assert.equal(bs.disrupted, false, 'clear_buffs should clear disrupted');
   assert.equal(bs.playerReducedNext10, 0, 'clear_buffs should clear playerReducedNext10');
+});
+
+// ─── damageBuff & defenseStat ────────────────────────────────────────────────
+
+test('_applyPlayerMove: damageBuff from engine state is added to base move damage', () => {
+  engine.init();
+  engine.awardXP(100); // level up — damageBuff becomes > 0
+  const damageBuff = engine.getState().damageBuff;
+  const scene = makeScene();
+  const bs    = makeBattleState({ professorHP: 100 });
+  bs.playerMoves       = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
+  bs.selectedMoveIndex = 0;
+  const ctx = makeCtx(bs);
+
+  scene._applyPlayerMove(ctx);
+
+  assert.equal(bs.professorHP, 100 - (22 + damageBuff), 'damageBuff should be added to move damage');
+});
+
+test('_applyPlayerMove: damageBuff of 0 does not alter base damage', () => {
+  engine.init(); // damageBuff starts at 0
+  const scene = makeScene();
+  const bs    = makeBattleState({ professorHP: 100 });
+  bs.playerMoves       = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
+  bs.selectedMoveIndex = 0;
+  const ctx = makeCtx(bs);
+
+  scene._applyPlayerMove(ctx);
+
+  assert.equal(bs.professorHP, 78, 'zero damageBuff should leave damage unchanged at 22');
+});
+
+test('_applyOpponentTurn: defenseStat from engine state reduces incoming damage', () => {
+  engine.init();
+  engine.awardXP(100); // level up — defenseStat becomes > 0
+  const defenseStat = engine.getState().defenseStat;
+  const scene = makeScene();
+  // minimal_pair: damage 18
+  const bs  = makeBattleState({ professorMoves: ['minimal_pair'] });
+  const ctx = makeCtx(bs);
+
+  scene._applyOpponentTurn(ctx);
+
+  const expectedHP = 100 - Math.max(0, 18 - defenseStat);
+  assert.equal(engine.getState().playerHP, expectedHP, 'defenseStat should reduce incoming damage');
+});
+
+test('_applyOpponentTurn: defenseStat of 0 does not alter incoming damage', () => {
+  engine.init(); // defenseStat = 0
+  const scene = makeScene();
+  // minimal_pair: damage 18
+  const bs  = makeBattleState({ professorMoves: ['minimal_pair'] });
+  const ctx = makeCtx(bs);
+
+  scene._applyOpponentTurn(ctx);
+
+  assert.equal(engine.getState().playerHP, 82, 'zero defenseStat should leave damage unchanged');
+});
+
+// ─── _awardBattleXP ──────────────────────────────────────────────────────────
+
+test('_awardBattleXP: awards positive XP for a professor victory', () => {
+  engine.init();
+  const scene = makeScene('prof_schwaartz', 'professor');
+  scene._awardBattleXP();
+  assert.ok(engine.getState().xp > 0, 'professor victory should award XP');
+});
+
+test('_awardBattleXP: awards positive XP for a student victory', () => {
+  engine.init();
+  const scene = makeScene('student_rohan', 'student');
+  scene._awardBattleXP();
+  assert.ok(engine.getState().xp > 0, 'student victory should award XP');
+});
+
+test('_awardBattleXP: professor awards more XP than student', () => {
+  engine.init();
+  const prof = makeScene('prof_schwaartz', 'professor');
+  prof._awardBattleXP();
+  const profXP = engine.getState().xp;
+
+  engine.init();
+  const stud = makeScene('student_rohan', 'student');
+  stud._awardBattleXP();
+  const studXP = engine.getState().xp;
+
+  assert.ok(profXP > studXP, 'professors should award more XP than students');
+});
+
+test('_awardBattleXP: returns { levelled, amount } object', () => {
+  engine.init();
+  const scene  = makeScene('prof_schwaartz', 'professor');
+  const result = scene._awardBattleXP();
+  assert.ok(typeof result === 'object' && result !== null, 'return value should be an object');
+  assert.ok('levelled' in result, 'object should have a levelled property');
+  assert.ok('amount'   in result, 'object should have an amount property');
+  assert.ok(result.amount > 0, 'amount should be a positive number');
+});
+
+// ─── drawHPBars — XP bar ──────────────────────────────────────────────────────
+
+test('drawHPBars: calls _drawPlayerXPBar with current xp and xpToNextLevel', () => {
+  engine.init();
+  const scene = makeScene();
+  scene.battleState = makeBattleState({ professorHP: 80 });
+  scene.battleState.professor = { id: 'prof_schwaartz', name: 'Prof. Schwaartz', hp: 80, moves: [] };
+  // Stub the draw helpers that touch Phaser objects.
+  scene._drawProfHPBar   = () => {};
+  scene._drawPlayerHPBar = () => {};
+  const xpBarCalls = [];
+  scene._drawPlayerXPBar = (xp, xpToNextLevel) => xpBarCalls.push({ xp, xpToNextLevel });
+
+  scene.drawHPBars();
+
+  assert.equal(xpBarCalls.length, 1, '_drawPlayerXPBar should be called once by drawHPBars');
+  const { xp, xpToNextLevel } = engine.getState();
+  assert.equal(xpBarCalls[0].xp, xp, 'should pass current xp from engine state');
+  assert.equal(xpBarCalls[0].xpToNextLevel, xpToNextLevel, 'should pass xpToNextLevel from engine state');
+});
+
+// ─── _drawPlayerXPBar ─────────────────────────────────────────────────────────
+
+test('_drawPlayerXPBar: draws full bar when xp equals xpToNextLevel', () => {
+  const scene = makeScene();
+  const calls = [];
+  const mockGraphics = {
+    clear:    () => {},
+    fillStyle: () => {},
+    fillRect:  (x, y, w, h) => calls.push({ x, y, w, h }),
+  };
+  scene.playerXPBar = mockGraphics;
+
+  scene._drawPlayerXPBar(100, 100); // xp = xpToNextLevel → ratio 1.0
+
+  // Expect two fillRect calls: background (full width) then fill (full width).
+  assert.equal(calls.length, 2, 'should call fillRect twice (background + fill)');
+  assert.equal(calls[0].w, calls[1].w, 'full xp should render fill at same width as background');
+});
+
+test('_drawPlayerXPBar: draws empty fill when xp is 0', () => {
+  const scene = makeScene();
+  const calls = [];
+  const mockGraphics = {
+    clear:    () => {},
+    fillStyle: () => {},
+    fillRect:  (x, y, w, h) => calls.push({ x, y, w, h }),
+  };
+  scene.playerXPBar = mockGraphics;
+
+  scene._drawPlayerXPBar(0, 100); // ratio 0 → fill width 0
+
+  assert.equal(calls.length, 2, 'should call fillRect twice (background + fill)');
+  assert.equal(calls[1].w, 0, 'zero xp should render fill with width 0');
+});
+
+test('_drawPlayerXPBar: renders empty bar when xpToNextLevel is 0 (guards divide-by-zero)', () => {
+  const scene = makeScene();
+  const calls = [];
+  const mockGraphics = {
+    clear:    () => {},
+    fillStyle: () => {},
+    fillRect:  (x, y, w, h) => calls.push({ x, y, w, h }),
+  };
+  scene.playerXPBar = mockGraphics;
+
+  scene._drawPlayerXPBar(50, 0); // xpToNextLevel = 0 → ratio should be 0, not NaN/Infinity
+
+  assert.equal(calls.length, 2, 'should still draw two rects even when xpToNextLevel is 0');
+  assert.equal(calls[1].w, 0, 'fill width should be 0 when xpToNextLevel is 0');
+});
+
+test('_drawPlayerXPBar: clamps ratio to 1 if xp exceeds xpToNextLevel', () => {
+  const scene = makeScene();
+  const calls = [];
+  const mockGraphics = {
+    clear:    () => {},
+    fillStyle: () => {},
+    fillRect:  (x, y, w, h) => calls.push({ x, y, w, h }),
+  };
+  scene.playerXPBar = mockGraphics;
+
+  scene._drawPlayerXPBar(150, 100); // xp > xpToNextLevel → should clamp to full width
+
+  assert.equal(calls[0].w, calls[1].w, 'overflowing xp should clamp fill to full bar width');
+});
+
+// ─── _endSeq — XP animation, XP message, and level-up ───────────────────────
+
+// Helper: creates a scene wired for _endSeq testing.
+// _awardBattleXP is stubbed to return { levelled, amount } without touching Phaser or engine.
+// _animatePlayerXP and _drawPlayerXPBar are stubbed to record calls without Phaser tweens.
+// _showLine is stubbed to record logged messages and invoke next() synchronously.
+// playerLevelText is a minimal mock supporting setText().
+function makeEndSeqScene({ levelled = false, amount = 20 } = {}) {
+  const scene = makeScene();
+  scene.battleState = makeBattleState();
+  scene._awardBattleXP = () => ({ levelled, amount });
+  scene._runSequence   = () => {}; // no-op: prevents seq from being consumed
+  const xpAnimCalls = [];
+  const xpBarCalls  = [];
+  const logLines    = [];
+  const levelTexts  = [];
+  scene._animatePlayerXP  = (from, to, max, next) => { xpAnimCalls.push({ from, to, max }); next(); };
+  scene._drawPlayerXPBar  = (xp, max)             => xpBarCalls.push({ xp, max });
+  scene._showLine         = (msg, next)            => { logLines.push(msg); next(); };
+  scene.playerLevelText   = { setText: t => levelTexts.push(t) };
+  scene._xpAnimCalls  = xpAnimCalls;
+  scene._xpBarCalls   = xpBarCalls;
+  scene._logLines     = logLines;
+  scene._levelTexts   = levelTexts;
+  return scene;
+}
+
+test('_endSeq: win (no level-up) pushes exactly 2 steps — animation then XP message', () => {
+  engine.init();
+  const scene = makeEndSeqScene({ levelled: false, amount: 20 });
+  const seq   = [];
+
+  scene._endSeq(seq, 'win');
+
+  assert.equal(seq.length, 2, 'win with no level-up should push 2 steps');
+  seq.forEach(step => step(() => {}));
+  assert.equal(scene._xpAnimCalls.length, 1, '_animatePlayerXP should be called once');
+});
+
+test('_endSeq: win (no level-up) shows "You earned N XP!" after animation', () => {
+  engine.init();
+  const scene = makeEndSeqScene({ levelled: false, amount: 20 });
+  const seq   = [];
+
+  scene._endSeq(seq, 'win');
+  seq.forEach(step => step(() => {}));
+
+  assert.equal(scene._logLines.length, 1, 'exactly one log message should appear');
+  assert.ok(scene._logLines[0].includes('20'), 'message should state the XP amount');
+  assert.ok(scene._logLines[0].toLowerCase().includes('xp'), 'message should mention XP');
+});
+
+test('_endSeq: win (no level-up) animates from xpBefore to xpAfter using xpMaxBefore', () => {
+  engine.init();
+  engine.awardXP(30); // prime engine: xp = 30 before the battle
+  const { xp: xpBefore, xpToNextLevel: xpMax } = engine.getState();
+  const scene = makeEndSeqScene({ levelled: false, amount: 20 });
+  scene._awardBattleXP = () => {
+    engine.awardXP(20); // 30 + 20 = 50 — well below 100, no level-up
+    return { levelled: false, amount: 20 };
+  };
+  const seq = [];
+
+  scene._endSeq(seq, 'win');
+  seq.forEach(step => step(() => {}));
+
+  const call = scene._xpAnimCalls[0];
+  assert.equal(call.from, xpBefore, 'animation should start from xp before the award');
+  assert.equal(call.to,   50,       'animation should end at xp after the award (50)');
+  assert.equal(call.max,  xpMax,    'denominator should be xpToNextLevel before the award');
+});
+
+test('_endSeq: loss pushes no steps and does not call _animatePlayerXP', () => {
+  engine.init();
+  const scene = makeEndSeqScene({ levelled: false });
+  const seq   = [];
+
+  scene._endSeq(seq, 'loss');
+
+  assert.equal(seq.length, 0, 'loss should push no seq steps');
+  assert.equal(scene._xpAnimCalls.length, 0, '_animatePlayerXP should not be called on loss');
+});
+
+test('_endSeq: level-up pushes exactly 4 steps — fill anim, XP message, level-up message, bar reset', () => {
+  engine.init();
+  const scene = makeEndSeqScene({ levelled: true, amount: 50 });
+  const seq = [];
+
+  scene._endSeq(seq, 'win');
+
+  assert.equal(seq.length, 4, 'level-up win should push exactly 4 steps');
+});
+
+test('_endSeq: level-up — XP message appears before level-up message', () => {
+  engine.init();
+  engine.awardXP(80); // xp = 80, xpMax = 100
+  const { xp: xpBefore, xpToNextLevel: xpMax } = engine.getState();
+  const scene = makeEndSeqScene({ levelled: true, amount: 50 });
+  scene._awardBattleXP = () => {
+    engine.awardXP(50); // 80 + 50 = 130 → level-up, remainder xp = 30
+    return { levelled: true, amount: 50 };
+  };
+  const seq = [];
+
+  scene._endSeq(seq, 'win');
+  seq.forEach(step => step(() => {}));
+
+  // Step 1: fill animation to xpMax
+  const anim = scene._xpAnimCalls[0];
+  assert.equal(anim.from, xpBefore, 'fill animation should start at xp before award');
+  assert.equal(anim.to,   xpMax,    'fill animation should fill bar to xpToNextLevel');
+  // Step 2: XP earned message
+  assert.ok(scene._logLines[0].includes('50'), 'first log message should state XP amount (50)');
+  // Step 3: level-up message
+  assert.ok(scene._logLines[1].includes('Level up'), 'second log message should be the level-up line');
+  // Step 4: bar reset to remainder xp (30)
+  assert.equal(scene._xpBarCalls[0].xp, 30, 'bar should reset to xp remainder (30) after level-up');
+});
+
+test('_endSeq: level-up updates playerLevelText with new level', () => {
+  engine.init();
+  const scene = makeEndSeqScene({ levelled: true, amount: 50 });
+  scene._awardBattleXP = () => {
+    engine.awardXP(100); // triggers level-up → level becomes 2
+    return { levelled: true, amount: 100 };
+  };
+  const seq = [];
+
+  scene._endSeq(seq, 'win');
+  seq.forEach(step => step(() => {}));
+
+  assert.equal(scene._levelTexts.length, 1, 'playerLevelText.setText should be called once');
+  assert.ok(scene._levelTexts[0].includes('2'), 'level text should reflect new level (2)');
+});
+
+// ─── learnedMoves award ──────────────────────────────────────────────────────
+
+test('_endSeq: win awards all enemy moves to learnedMoves', () => {
+  engine.init();
+  const scene = makeEndSeqScene({ levelled: false, amount: 20 });
+  scene.battleState.professor.moves = ['minimal_pair', 'stress_shift'];
+  const seq = [];
+
+  scene._endSeq(seq, 'win');
+
+  const learned = engine.getState().learnedMoves;
+  assert.ok(learned.includes('minimal_pair'), 'minimal_pair should be in learnedMoves after win');
+  assert.ok(learned.includes('stress_shift'), 'stress_shift should be in learnedMoves after win');
+});
+
+test('_endSeq: loss does not award enemy moves to learnedMoves', () => {
+  engine.init();
+  const scene = makeEndSeqScene({ levelled: false, amount: 20 });
+  scene.battleState.professor.moves = ['minimal_pair', 'stress_shift'];
+  const seq = [];
+
+  scene._endSeq(seq, 'loss');
+
+  const learned = engine.getState().learnedMoves;
+  assert.ok(!learned.includes('minimal_pair'), 'minimal_pair should not be in learnedMoves after loss');
+  assert.ok(!learned.includes('stress_shift'), 'stress_shift should not be in learnedMoves after loss');
+});
+
+test('_endSeq: winning twice with the same moves does not duplicate learnedMoves entries', () => {
+  engine.init();
+  const scene = makeEndSeqScene({ levelled: false, amount: 20 });
+  scene.battleState.professor.moves = ['minimal_pair'];
+
+  scene._endSeq([], 'win');
+  scene._endSeq([], 'win');
+
+  const count = engine.getState().learnedMoves.filter(id => id === 'minimal_pair').length;
+  assert.equal(count, 1, 'minimal_pair should appear exactly once in learnedMoves after two wins');
+});
+
+// ─── ALL_MOVE_MAP coverage (unified registry) ────────────────────────────────
+// ALL_MOVE_MAP is a module-level constant and not exported. These tests verify
+// the invariants it depends on: globally unique IDs across all three tables,
+// so merging is unambiguous and resolution is safe.
+
+test('move IDs are globally unique: no overlap between professorMoves and npcMoves', () => {
+  const profIds = new Set(professorMoves.map(m => m.id));
+  const npcIds  = npcMoves.map(m => m.id);
+  const overlap = npcIds.filter(id => profIds.has(id));
+  assert.equal(overlap.length, 0, `professor and NPC move IDs must not overlap; found: ${overlap.join(', ')}`);
+});
+
+test('move IDs are globally unique: no overlap between professorMoves and playerMoves', () => {
+  const profIds   = new Set(professorMoves.map(m => m.id));
+  const playerIds = playerMoves.map(m => m.id);
+  const overlap   = playerIds.filter(id => profIds.has(id));
+  assert.equal(overlap.length, 0, `professor and player move IDs must not overlap; found: ${overlap.join(', ')}`);
+});
+
+test('all playerMoves IDs exist in npcMoves (shared subset — expected)', () => {
+  const npcIds    = new Set(npcMoves.map(m => m.id));
+  const playerIds = playerMoves.map(m => m.id);
+  const missing   = playerIds.filter(id => !npcIds.has(id));
+  assert.equal(missing.length, 0, `every playerMove ID should also exist in npcMoves; missing: ${missing.join(', ')}`);
+});
+
+test('_endSeq: win awards NPC move IDs correctly', () => {
+  engine.init();
+  const scene = makeEndSeqScene({ levelled: false, amount: 20 });
+  scene.battleState.professor.moves = ['lit_review_dump', 'burnout'];
+  const seq = [];
+
+  scene._endSeq(seq, 'win');
+
+  const learned = engine.getState().learnedMoves;
+  assert.ok(learned.includes('lit_review_dump'), 'NPC move lit_review_dump should be awarded on win');
+  assert.ok(learned.includes('burnout'), 'NPC move burnout should be awarded on win');
 });

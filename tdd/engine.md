@@ -17,15 +17,24 @@ Owns the single `gameState` object — the authoritative record of everything th
 
 ```js
 {
-  activeScene: string,       // current scene: 'overworld' | 'battle'
-  playerHP: number,          // current player HP (max: 100)
-  playerPosition: {          // player's tile coordinates in the current region
+  activeScene: string,         // current scene: 'overworld' | 'battle'
+  playerHP: number,            // current player HP (max: 100)
+  playerPosition: {            // player's tile coordinates in the current region
     x: number,
     y: number,
   },
-  currentRegion: string,     // active map region id (e.g. 'outdoor', 'main_building')
-  defeatedProfessors: array, // ids of defeated professors, in defeat order
+  currentRegion: string,       // active map region id (e.g. 'outdoor', 'main_building')
+  defeatedProfessors: array,   // ids of defeated professors, in defeat order
   pendingEncounter: string|null, // professor id set by map.js when player steps on trigger; null otherwise
+  // Progression — persist across faints; reset only on page reload (no save/load)
+  xp: number,                  // accumulated XP within the session (starts at 0)
+  level: number,               // current player level (starts at 1)
+  xpToNextLevel: number,       // XP threshold for the next level-up
+  damageBuff: number,          // flat bonus added to all player move damage
+  defenseStat: number,         // flat reduction applied to all incoming damage (min 0)
+  // Move loadout — persist across faints; reset only on page reload
+  learnedMoves: string[],      // all move IDs the player has unlocked (starts with 4 default moves)
+  activeMoves: string[],       // ordered 4-move battle loadout (subset of learnedMoves)
 }
 ```
 
@@ -38,7 +47,7 @@ Owns the single `gameState` object — the authoritative record of everything th
 - **Does:** Sets `gameState` to its starting values.
 - **Inputs:** none
 - **Returns:** void
-- **Side effects:** Writes initial values to `gameState`: `activeScene: 'overworld'`, `playerHP: 100`, `playerPosition: { x: <pond start>, y: <pond start> }`, `currentRegion: 'outdoor'`, `defeatedProfessors: []`, `pendingEncounter: null`.
+- **Side effects:** Writes initial values to `gameState`: `activeScene: 'overworld'`, `playerHP: 100`, `playerPosition: { x: <pond start>, y: <pond start> }`, `currentRegion: 'outdoor'`, `defeatedProfessors: []`, `pendingEncounter: null`, `xp: 0`, `level: 1`, `xpToNextLevel: 100`, `damageBuff: 0`, `defenseStat: 0`, `learnedMoves: [<4 starting move IDs>]`, `activeMoves: [<4 starting move IDs>]`.
 
 ---
 
@@ -128,7 +137,34 @@ Owns the single `gameState` object — the authoritative record of everything th
 - **Does:** Resets game state to starting values — used on player faint.
 - **Inputs:** none
 - **Returns:** void
-- **Side effects:** Restores `playerHP`, `playerPosition`, `currentRegion`, and `activeScene` to starting values. Does **not** clear `defeatedProfessors` — progress persists across faints within a session.
+- **Side effects:** Restores `playerHP`, `playerPosition`, `currentRegion`, and `activeScene` to starting values. Does **not** clear `defeatedProfessors`, `xp`, `level`, `xpToNextLevel`, `damageBuff`, `defenseStat`, `learnedMoves`, or `activeMoves` — all progression and move state persists across faints. State resets to zero only when `init()` is called (page load).
+
+---
+
+### awardXP(amount)
+
+- **Does:** Adds XP and handles level-up if the threshold is crossed.
+- **Inputs:** `amount` — number: XP to award.
+- **Returns:** boolean: `true` if a level-up occurred, `false` otherwise. (Used by BattleScene to trigger the level-up UI message.)
+- **Side effects:** Increments `gameState.xp`. If `xp >= xpToNextLevel`: increments `level`, resets `xp` to the carry-over remainder, updates `xpToNextLevel` (constant or per-level formula), increments `damageBuff` and `defenseStat` by their per-level amounts.
+
+---
+
+### addLearnedMove(moveId)
+
+- **Does:** Adds a move ID to the player's learned move pool.
+- **Inputs:** `moveId` — string: id of the move to unlock.
+- **Returns:** void
+- **Side effects:** Appends `moveId` to `gameState.learnedMoves` if not already present.
+
+---
+
+### setActiveMoves(moveIds)
+
+- **Does:** Updates the player's active battle loadout.
+- **Inputs:** `moveIds` — string[]: ordered array of exactly 4 move IDs, all of which must be in `learnedMoves`.
+- **Returns:** void
+- **Side effects:** Writes `gameState.activeMoves`.
 
 ---
 

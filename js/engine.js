@@ -16,7 +16,19 @@ const PRE_CASTLE_PROFESSOR_IDS = professors.slice(0, -2).map(p => p.id);
 
 // Starting values used by both init() and resetGame().
 const STARTING_REGION = 'outdoor_campus';
-const STARTING_HP = 100;
+const STARTING_HP     = 100;
+const STARTING_LEVEL  = 1;
+const STARTING_XP     = 0;
+const XP_PER_LEVEL    = 100; // XP required to reach each successive level
+
+// The 4 moves the player starts with and uses as their default battle loadout.
+// Matches the hardcoded ACTIVE_MOVE_IDS in BattleScene.js until that constant
+// is replaced by engine state (issue test_project-z28).
+const STARTING_MOVE_IDS = ['non_sequitur', 'all_nighter', 'counterexample', 'correction'];
+
+// Per-level stat gains applied when awardXP() triggers a level-up.
+const DAMAGE_BUFF_PER_LEVEL  = 2; // flat bonus added to all player move damage
+const DEFENSE_BUFF_PER_LEVEL = 2; // flat reduction applied to all incoming damage
 
 // Module-level state object. Private — never exported directly.
 let gameState = {};
@@ -24,12 +36,21 @@ let gameState = {};
 // Sets gameState to its starting values. Called once at game boot.
 export function init() {
   gameState = {
-    activeScene: 'overworld',
-    playerHP: STARTING_HP,
-    playerPosition: { ...regions[STARTING_REGION].entryPosition },
-    currentRegion: STARTING_REGION,
+    activeScene:        'overworld',
+    playerHP:           STARTING_HP,
+    playerPosition:     { ...regions[STARTING_REGION].entryPosition },
+    currentRegion:      STARTING_REGION,
     defeatedProfessors: [],
-    pendingEncounter: null,
+    pendingEncounter:   null,
+    // XP and levelling (bk6)
+    xp:             STARTING_XP,
+    level:          STARTING_LEVEL,
+    xpToNextLevel:  XP_PER_LEVEL,
+    damageBuff:     0,  // flat bonus added to all player move damage on level-up
+    defenseStat:    0,  // flat reduction applied to all incoming damage on level-up
+    // Move loadout (3v1)
+    learnedMoves:   [...STARTING_MOVE_IDS],       // all move IDs the player has unlocked
+    activeMoves:    [...STARTING_MOVE_IDS],        // ordered 4-move battle loadout
   };
 }
 
@@ -93,8 +114,37 @@ export function allProfessorsDefeated() {
   );
 }
 
+// Awards XP to the player. If xp reaches or exceeds xpToNextLevel, triggers a
+// level-up: increments level, carries over the remainder, and bumps damageBuff
+// and defenseStat. Returns true if a level-up occurred, false otherwise.
+export function awardXP(amount) {
+  gameState.xp += amount;
+  if (gameState.xp >= gameState.xpToNextLevel) {
+    gameState.xp          -= gameState.xpToNextLevel;
+    gameState.level       += 1;
+    gameState.damageBuff  += DAMAGE_BUFF_PER_LEVEL;
+    gameState.defenseStat += DEFENSE_BUFF_PER_LEVEL;
+    return true;
+  }
+  return false;
+}
+
+// Adds a move ID to the player's learned move pool.
+// Idempotent — calling it twice for the same ID has no effect.
+export function addLearnedMove(moveId) {
+  if (!gameState.learnedMoves.includes(moveId)) {
+    gameState.learnedMoves.push(moveId);
+  }
+}
+
+// Updates the player's active battle loadout to the given ordered array of 4 move IDs.
+export function setActiveMoves(moveIds) {
+  gameState.activeMoves = [...moveIds];
+}
+
 // Resets HP, position, region, and scene to starting values.
-// Does NOT clear defeatedProfessors — progress persists across faints.
+// Does NOT clear defeatedProfessors, xp, level, damageBuff, defenseStat,
+// learnedMoves, or activeMoves — all progression persists across faints.
 // Called automatically by setPlayerHP() when HP hits zero.
 export function resetGame() {
   gameState.activeScene = 'overworld';

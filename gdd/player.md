@@ -10,9 +10,20 @@
 - HP: 100
 - Attack: derived from move selection (no separate stat)
 
-**Starting condition:** Full HP, positioned at the pond (outdoor campus entrance), zero professors defeated.
+**Starting condition:** Full HP, positioned at the pond (outdoor campus entrance), zero professors defeated, level 1, zero XP.
 
 > **→ TDD note (engine):** Player position and defeated-professor count must persist across the overworld and battle scenes for the session duration. No save/load required — state resets on page reload.
+
+---
+
+## Progression
+
+The player earns XP from every battle victory and levels up by accumulating XP across the session. Levelling up applies permanent stat buffs (increased max HP, flat damage bonus, flat damage reduction) that persist for the remainder of that session.
+
+**Persistence rules:**
+- XP, level, stat buffs, and learned moves all persist across battles and across player faints within a single play session.
+- `resetGame()` (triggered on faint) restores HP, position, and region — it does not clear XP, level, damageBuff, defenseStat, learnedMoves, or activeMoves.
+- There is no save/load mechanic. All progression state is in-memory only: closing or reloading the page starts the player at level 1 with zero XP.
 
 ---
 

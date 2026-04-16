@@ -48,6 +48,11 @@ const PLAYER_HP_NUM_X   = 350; // x for the "85/100" numbers
 const HP_BAR_W = 168;
 const HP_BAR_H =   8;
 
+// Player XP bar: sits beneath the HP bar (HP_BAR_Y + HP_BAR_H + 4px gap).
+const PLAYER_XP_BAR_X = 220;
+const PLAYER_XP_BAR_Y = 220; // 208 + 8 + 4
+const XP_BAR_H        =   5;
+
 // Move menu: stacked vertically in the left half of the UI panel.
 const MOVE_X      =  16;
 const MOVE_Y_BASE = UI_PANEL_Y + 14;
@@ -66,11 +71,15 @@ const HP_POST_PAUSE = 500;
 const PROF_MOVE_MAP = Object.fromEntries(professorMoves.map(m => [m.id, m]));
 const NPC_MOVE_MAP  = Object.fromEntries(npcMoves.map(m => [m.id, m]));
 
-// The four moves available to the player in battle, in display order.
-// data.js defines six player moves; this list is an intentional subset.
-// Excluded: 'cite_this' (skip) and 'hot_take' (clear_debuff) — kept in data.js
-// for completeness but not wired into the active battle UI in this milestone.
-const ACTIVE_MOVE_IDS = ['non_sequitur', 'all_nighter', 'counterexample', 'correction'];
+// Unified move lookup across all three tables. IDs are globally unique, so merging is safe.
+// Used to resolve activeMoves IDs to move objects regardless of which table they originated from.
+const ALL_MOVE_MAP = Object.fromEntries(
+  [...professorMoves, ...npcMoves, ...playerMoves].map(m => [m.id, m])
+);
+
+// XP awarded to the player on battle victory, by opponent type.
+const XP_PER_PROFESSOR = 50;
+const XP_PER_STUDENT   = 20;
 
 // Top-level action menu labels, in display order.
 const ACTIONS = ['Fight', 'Run', 'Item'];
@@ -127,8 +136,8 @@ export default class BattleScene extends Phaser.Scene {
     // Null when no line is waiting; set by _showLine(), cleared by the advance handler.
     this._advanceCallback = null;
 
-    // Build the active move list from the ordered subset defined by ACTIVE_MOVE_IDS.
-    const activeMoves = ACTIVE_MOVE_IDS.map(id => playerMoves.find(m => m.id === id));
+    // Build the active move list from engine state — set by the move selection kiosk.
+    const activeMoves = engine.getState().activeMoves.map(id => ALL_MOVE_MAP[id]);
 
     // battleState is the authoritative source of truth for this scene.
     // 'professor' stores the opponent object regardless of opponentType — the field
@@ -199,6 +208,7 @@ export default class BattleScene extends Phaser.Scene {
     // --- HP bars (Graphics objects; redrawn whenever HP changes) ---
     this.profHPBar   = this.add.graphics();
     this.playerHPBar = this.add.graphics();
+    this.playerXPBar = this.add.graphics();
 
     // --- Name / HP labels ---
     this.add.text(PROF_HP_LABEL_X, PROF_HP_LABEL_Y, prof.name, {
@@ -211,6 +221,11 @@ export default class BattleScene extends Phaser.Scene {
 
     // Numeric HP counter shown next to the player HP bar.
     this.playerHPText = this.add.text(PLAYER_HP_NUM_X, PLAYER_HP_BAR_Y - 2, '', {
+      fontSize: '10px', fill: '#226622', fontFamily: 'monospace',
+    });
+
+    // Level indicator shown to the right of the "You" label row.
+    this.playerLevelText = this.add.text(PLAYER_HP_NUM_X, PLAYER_HP_LABEL_Y, `Lv.${engine.getState().level}`, {
       fontSize: '10px', fill: '#226622', fontFamily: 'monospace',
     });
 
@@ -454,6 +469,9 @@ export default class BattleScene extends Phaser.Scene {
       ? 40
       : move.damage;
 
+    // Flat damage bonus from player level-ups.
+    playerDamage += engine.getState().damageBuff;
+
     // Flat damage reduction from NPC 'reduce_next_10' or 'heal_and_reduce_next'.
     if (bs.playerReducedNext10 > 0) {
       playerDamage = Math.max(0, playerDamage - bs.playerReducedNext10);
@@ -602,6 +620,9 @@ export default class BattleScene extends Phaser.Scene {
     if (oppMove.effect === 'conditional_damage' && bs.lastPlayerDamage >= 30) {
       profDamage = 40;
     }
+
+    // Flat damage reduction from player level-ups (minimum 0 net damage).
+    profDamage = Math.max(0, profDamage - engine.getState().defenseStat);
 
     // Deal damage to player.
     const fromPHP = engine.getState().playerHP;
@@ -848,9 +869,9 @@ export default class BattleScene extends Phaser.Scene {
         },
       });
     } else {
-      // Student NPC battle end: stop battle music and return to the debug selector.
-      // DebugSelectorScene.wake() is responsible for starting intro_credits.
-      // Do not call switchTo('overworld') here — the debug selector is not the overworld.
+      // Student NPC battle end: stop battle music and return to the battle mode selector.
+      // BattleModeScene.wake() is responsible for starting intro_credits.
+      // Do not call switchTo('overworld') here — the battle mode selector is not the overworld.
       audio.stop();
       this.scene.stop('BattleScene');
       this.scene.wake('OverworldScene');
@@ -865,6 +886,8 @@ export default class BattleScene extends Phaser.Scene {
   drawHPBars() {
     this._drawProfHPBar(this.battleState.professorHP);
     this._drawPlayerHPBar(engine.getState().playerHP);
+    const { xp, xpToNextLevel } = engine.getState();
+    this._drawPlayerXPBar(xp, xpToNextLevel);
   }
 
   // Redraws the professor HP bar at the given hp value and updates the sprite.
@@ -888,6 +911,16 @@ export default class BattleScene extends Phaser.Scene {
     this.playerHPBar.fillStyle(this._hpColour(ratio));
     this.playerHPBar.fillRect(PLAYER_HP_BAR_X, PLAYER_HP_BAR_Y, Math.floor(HP_BAR_W * ratio), HP_BAR_H);
     this.playerHPText.setText(`${Math.max(0, Math.round(hp))}/100`);
+  }
+
+  // Redraws the player XP bar beneath the HP bar at the given xp / xpToNextLevel values.
+  _drawPlayerXPBar(xp, xpToNextLevel) {
+    const ratio = xpToNextLevel > 0 ? Math.min(1, xp / xpToNextLevel) : 0;
+    this.playerXPBar.clear();
+    this.playerXPBar.fillStyle(0xcccccc);
+    this.playerXPBar.fillRect(PLAYER_XP_BAR_X, PLAYER_XP_BAR_Y, HP_BAR_W, XP_BAR_H);
+    this.playerXPBar.fillStyle(0x4488ff);
+    this.playerXPBar.fillRect(PLAYER_XP_BAR_X, PLAYER_XP_BAR_Y, Math.floor(HP_BAR_W * ratio), XP_BAR_H);
   }
 
   // Updates the three action Text objects (Fight / Run / Item) to reflect selection.
@@ -1043,11 +1076,53 @@ export default class BattleScene extends Phaser.Scene {
     this.scene.get('AudioScene').play(id);
   }
 
-  // Finalises a turn with a win or loss outcome: sets bs.outcome, runs the
-  // accumulated visual sequence, then sets phase to 'end' to trigger endBattle().
+  // Awards XP for the current battle victory.
+  // Returns { levelled, amount }: levelled is true if a level-up occurred; amount
+  // is the XP awarded (used by _endSeq to display the "You earned N XP!" message).
+  _awardBattleXP() {
+    const amount   = this.opponentType === 'professor' ? XP_PER_PROFESSOR : XP_PER_STUDENT;
+    const levelled = engine.awardXP(amount);
+    return { levelled, amount };
+  }
+
+  // Visual step: tween the player XP bar from `fromXP` to `toXP` over HP_ANIM_MS,
+  // then pause HP_POST_PAUSE before calling next. xpToNextLevel is held constant
+  // as the denominator for the bar ratio throughout the animation.
+  _animatePlayerXP(fromXP, toXP, xpToNextLevel, next) {
+    this.tweens.addCounter({
+      from:       fromXP,
+      to:         toXP,
+      duration:   HP_ANIM_MS,
+      ease:       'Linear',
+      onUpdate:   tween => this._drawPlayerXPBar(tween.getValue(), xpToNextLevel),
+      onComplete: () => this.time.delayedCall(HP_POST_PAUSE, next),
+    });
+  }
+
   _endSeq(seq, outcome) {
     const bs   = this.battleState;
     bs.outcome = outcome;
+    if (outcome === 'win') {
+      // Award all enemy moves to the player's learnedMoves pool.
+      this.battleState.professor.moves.forEach(id => engine.addLearnedMove(id));
+      const { xp: xpBefore, xpToNextLevel: xpMaxBefore } = engine.getState();
+      const { levelled, amount } = this._awardBattleXP();
+      const { xp: xpAfter, xpToNextLevel: xpMaxAfter, level } = engine.getState();
+      if (levelled) {
+        // Animate bar filling to 100%, show XP and level-up messages, then reset bar.
+        seq.push(next => this._animatePlayerXP(xpBefore, xpMaxBefore, xpMaxBefore, next));
+        seq.push(next => this._showLine(`You earned ${amount} XP!`, next));
+        seq.push(next => this._showLine(`Level up! You reached level ${level}.`, next));
+        seq.push(next => {
+          this._drawPlayerXPBar(xpAfter, xpMaxAfter);
+          this.playerLevelText.setText(`Lv.${level}`);
+          next();
+        });
+      } else {
+        seq.push(next => this._animatePlayerXP(xpBefore, xpAfter, xpMaxBefore, next));
+        seq.push(next => this._showLine(`You earned ${amount} XP!`, next));
+      }
+    }
     this._runSequence(seq, () => { bs.phase = 'end'; });
   }
 }

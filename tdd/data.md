@@ -17,7 +17,7 @@ The data layer is split into domain files for LLM-context efficiency. Each file 
 
 | File | Exports | Consumed by |
 |------|---------|-------------|
-| `professors.js` | `professorMoves`, `professors` | `BattleScene`, `DebugSelectorScene`, `engine` |
+| `professors.js` | `professorMoves`, `professors` | `BattleScene`, `BattleModeScene`, `engine` |
 | `playerMoves.js` | `playerMoves` | `BattleScene` |
 | `students.js` | `npcMoves`, `studentNPCs` | `BattleScene` |
 | `ambientNpcs.js` | `ambientNPCs` | `OverworldScene` |
@@ -237,4 +237,4 @@ TILE = {
 - `BattleScene` — `professors`, `professorMoves`, `playerMoves`, `studentNPCs`, `npcMoves`, `items`
 - `DialogueScene` — `dialogueSequences`
 - `AudioScene` — `audioTracks`
-- `DebugSelectorScene` — `professors`
+- `BattleModeScene` — `professors`

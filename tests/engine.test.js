@@ -1,6 +1,6 @@
 // tests/engine.test.js — test suite for js/engine.js
-// Covers: state initialisation, HP management, win state, loss state, and reset behaviour.
-// engine.js is pure JS with no Phaser dependency, so all tests are synchronous.
+// Covers: state initialisation, HP management, win state, loss state, reset behaviour,
+// XP/levelling, move pool management.
 
 import { test, assert } from './runner.js';
 import * as engine from '../js/engine.js';
@@ -151,4 +151,144 @@ test('allProfessorsDefeated() excludes the final boss (prof_vec_tor)', () => {
     engine.allProfessorsDefeated(),
     'allProfessorsDefeated() should not require vec_tor to be defeated'
   );
+});
+
+// ─── INIT — progression fields ────────────────────────────────────────────────
+
+test('init() sets xp to 0', () => {
+  engine.init();
+  assert.equal(engine.getState().xp, 0);
+});
+
+test('init() sets level to 1', () => {
+  engine.init();
+  assert.equal(engine.getState().level, 1);
+});
+
+test('init() sets damageBuff to 0', () => {
+  engine.init();
+  assert.equal(engine.getState().damageBuff, 0);
+});
+
+test('init() sets defenseStat to 0', () => {
+  engine.init();
+  assert.equal(engine.getState().defenseStat, 0);
+});
+
+test('init() seeds learnedMoves with 4 starting moves', () => {
+  engine.init();
+  assert.equal(engine.getState().learnedMoves.length, 4);
+});
+
+test('init() seeds activeMoves with 4 starting moves matching learnedMoves', () => {
+  engine.init();
+  const state = engine.getState();
+  assert.equal(state.activeMoves.length, 4);
+  assert.ok(
+    state.activeMoves.every(id => state.learnedMoves.includes(id)),
+    'all activeMoves should be in learnedMoves after init'
+  );
+});
+
+// ─── awardXP ─────────────────────────────────────────────────────────────────
+
+test('awardXP() increases xp by the given amount', () => {
+  engine.init();
+  engine.awardXP(30);
+  assert.equal(engine.getState().xp, 30);
+});
+
+test('awardXP() returns false when no level-up occurs', () => {
+  engine.init();
+  const leveledUp = engine.awardXP(30);
+  assert.equal(leveledUp, false);
+});
+
+test('awardXP() returns true when XP reaches the level-up threshold', () => {
+  engine.init();
+  const leveledUp = engine.awardXP(100);
+  assert.equal(leveledUp, true);
+});
+
+test('awardXP() increments level on level-up', () => {
+  engine.init();
+  engine.awardXP(100);
+  assert.equal(engine.getState().level, 2);
+});
+
+test('awardXP() carries over excess XP after level-up', () => {
+  engine.init();
+  engine.awardXP(130); // threshold 100 — 30 XP should carry over
+  assert.equal(engine.getState().xp, 30);
+});
+
+test('awardXP() increases damageBuff on level-up', () => {
+  engine.init();
+  engine.awardXP(100);
+  assert.ok(engine.getState().damageBuff > 0, 'damageBuff should increase after level-up');
+});
+
+test('awardXP() increases defenseStat on level-up', () => {
+  engine.init();
+  engine.awardXP(100);
+  assert.ok(engine.getState().defenseStat > 0, 'defenseStat should increase after level-up');
+});
+
+test('awardXP() accumulates across multiple calls without level-up', () => {
+  engine.init();
+  engine.awardXP(30);
+  engine.awardXP(40);
+  assert.equal(engine.getState().xp, 70);
+});
+
+// ─── XP persistence across faint ────────────────────────────────────────────
+
+test('XP is preserved when player faints (resetGame does not clear xp)', () => {
+  engine.init();
+  engine.awardXP(50);
+  engine.setPlayerHP(0); // triggers resetGame()
+  assert.equal(engine.getState().xp, 50, 'xp should survive a faint');
+});
+
+test('level is preserved when player faints', () => {
+  engine.init();
+  engine.awardXP(100); // level up to 2
+  engine.setPlayerHP(0); // faint
+  assert.equal(engine.getState().level, 2, 'level should survive a faint');
+});
+
+test('damageBuff is preserved when player faints', () => {
+  engine.init();
+  engine.awardXP(100);
+  const buff = engine.getState().damageBuff;
+  engine.setPlayerHP(0);
+  assert.equal(engine.getState().damageBuff, buff, 'damageBuff should survive a faint');
+});
+
+// ─── addLearnedMove ──────────────────────────────────────────────────────────
+
+test('addLearnedMove() adds a new move id to learnedMoves', () => {
+  engine.init();
+  engine.addLearnedMove('cite_this');
+  assert.ok(engine.getState().learnedMoves.includes('cite_this'));
+});
+
+test('addLearnedMove() is idempotent — calling it twice does not create duplicates', () => {
+  engine.init();
+  const before = engine.getState().learnedMoves.length;
+  engine.addLearnedMove('cite_this');
+  engine.addLearnedMove('cite_this');
+  assert.equal(engine.getState().learnedMoves.length, before + 1);
+});
+
+// ─── setActiveMoves ──────────────────────────────────────────────────────────
+
+test('setActiveMoves() updates activeMoves to the provided array', () => {
+  engine.init();
+  const newLoadout = ['cite_this', 'all_nighter', 'counterexample', 'correction'];
+  engine.setActiveMoves(newLoadout);
+  const active = engine.getState().activeMoves;
+  assert.equal(active.length, 4);
+  assert.equal(active[0], 'cite_this');
+  assert.equal(active[1], 'all_nighter');
 });
