@@ -90,6 +90,11 @@ export default class BattleModeScene extends Phaser.Scene {
       fontSize: '10px', color: '#666688', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
+    // Move Kiosk button — opens the loadout manager before a battle
+    this._makeNavButton(200, 880, 'Move Kiosk', () => {
+      this.scene.launch('MoveKioskScene', {});
+    });
+
     // Professor buttons (left column, encounter order)
     professors.forEach((prof, i) => {
       const y = BTN_Y0 + i * BTN_GAP;

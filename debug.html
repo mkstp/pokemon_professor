@@ -11,10 +11,11 @@
 <body>
   <script src="vendor/phaser.min.js"></script>
   <script type="module">
-    import BattleModeScene from './js/scenes/BattleModeScene.js';
-    import BattleScene        from './js/scenes/BattleScene.js';
-    import DialogueScene      from './js/scenes/DialogueScene.js';
-    import AudioScene         from './js/scenes/AudioScene.js';
+    import BattleModeScene  from './js/scenes/BattleModeScene.js';
+    import BattleScene      from './js/scenes/BattleScene.js';
+    import DialogueScene    from './js/scenes/DialogueScene.js';
+    import AudioScene       from './js/scenes/AudioScene.js';
+    import MoveKioskScene   from './js/scenes/MoveKioskScene.js';
 
     new Phaser.Game({
       type:            Phaser.AUTO,
@@ -29,6 +30,7 @@
         BattleScene,
         DialogueScene,
         AudioScene,
+        MoveKioskScene,
       ],
       physics: {
         default: 'arcade',
