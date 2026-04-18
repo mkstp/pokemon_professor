@@ -5,6 +5,7 @@
 import { test, assert } from './runner.js';
 import * as engine from '../js/engine.js';
 import { professors } from '../js/data/professors.js';
+import { playerMoves } from '../js/data/moves.js';
 
 // IDs of all professors who must be defeated before the castle unlocks.
 // Mirrors the PRE_CASTLE_PROFESSOR_IDS slice in engine.js (all except the last).
@@ -190,6 +191,18 @@ test('init() seeds activeMoves with 4 starting moves matching learnedMoves', () 
   );
 });
 
+// Regression: STARTING_MOVE_IDS must reference IDs that exist in moves.js playerMoves.
+// Previously engine.js had stale IDs (all_nighter, counterexample, correction) from a
+// deleted playerMoves.js, causing ALL_MOVE_MAP lookups to return undefined in BattleScene.
+test('init() starting move IDs all exist in the playerMoves data table', () => {
+  engine.init();
+  const knownIds = new Set(playerMoves.map(m => m.id));
+  const state = engine.getState();
+  state.learnedMoves.forEach(id => {
+    assert.ok(knownIds.has(id), `starting move id "${id}" not found in playerMoves data`);
+  });
+});
+
 // ─── awardXP ─────────────────────────────────────────────────────────────────
 
 test('awardXP() increases xp by the given amount', () => {
@@ -291,4 +304,215 @@ test('setActiveMoves() updates activeMoves to the provided array', () => {
   assert.equal(active.length, 4);
   assert.equal(active[0], 'cite_this');
   assert.equal(active[1], 'all_nighter');
+});
+
+// ─── INVENTORY — init ────────────────────────────────────────────────────────
+
+test('init() sets inventory to empty array', () => {
+  engine.init();
+  assert.isArray(engine.getState().inventory, 'inventory should be an array');
+  assert.equal(engine.getState().inventory.length, 0);
+});
+
+test('init() sets expBoost to 0', () => {
+  engine.init();
+  assert.equal(engine.getState().expBoost, 0);
+});
+
+// ─── addItem ─────────────────────────────────────────────────────────────────
+
+test('addItem() adds a consumable to inventory with qty 1', () => {
+  engine.init();
+  engine.addItem('triscuit');
+  const inv = engine.getState().inventory;
+  assert.equal(inv.length, 1);
+  assert.equal(inv[0].itemId, 'triscuit');
+  assert.equal(inv[0].qty, 1);
+});
+
+test('addItem() increments qty when the same item is added again', () => {
+  engine.init();
+  engine.addItem('triscuit');
+  engine.addItem('triscuit');
+  const entry = engine.getState().inventory.find(e => e.itemId === 'triscuit');
+  assert.equal(entry.qty, 2, 'qty should be 2 after adding the same item twice');
+});
+
+test('addItem() for upgrade immediately applies boost_defense to defenseStat', () => {
+  engine.init();
+  const before = engine.getState().defenseStat;
+  engine.addItem('emotional_support_pickle'); // effect: boost_defense, value: 5
+  assert.equal(engine.getState().defenseStat, before + 5, 'defenseStat should increase by 5 on upgrade acquisition');
+});
+
+test('addItem() for upgrade still records it in inventory', () => {
+  engine.init();
+  engine.addItem('emotional_support_pickle');
+  assert.ok(engine.hasItem('emotional_support_pickle'), 'upgrade should appear in inventory after addItem');
+});
+
+// ─── hasItem ─────────────────────────────────────────────────────────────────
+
+test('hasItem() returns false when item not in inventory', () => {
+  engine.init();
+  assert.equal(engine.hasItem('triscuit'), false);
+});
+
+test('hasItem() returns true after addItem()', () => {
+  engine.init();
+  engine.addItem('triscuit');
+  assert.equal(engine.hasItem('triscuit'), true);
+});
+
+test('hasItem() returns false after item qty drops to 0', () => {
+  engine.init();
+  engine.addItem('triscuit');
+  engine.removeItem('triscuit');
+  assert.equal(engine.hasItem('triscuit'), false, 'hasItem should be false after qty reaches 0');
+});
+
+// ─── removeItem ──────────────────────────────────────────────────────────────
+
+test('removeItem() decrements qty by 1', () => {
+  engine.init();
+  engine.addItem('triscuit');
+  engine.addItem('triscuit');
+  engine.removeItem('triscuit');
+  const entry = engine.getState().inventory.find(e => e.itemId === 'triscuit');
+  assert.equal(entry.qty, 1, 'qty should be 1 after one removal from qty 2');
+});
+
+test('removeItem() is a no-op when item not in inventory', () => {
+  engine.init();
+  engine.removeItem('triscuit'); // should not throw
+  assert.equal(engine.getState().inventory.length, 0);
+});
+
+// ─── getConsumables ──────────────────────────────────────────────────────────
+
+test('getConsumables() returns only consumable-category items', () => {
+  engine.init();
+  engine.addItem('triscuit');                // consumable
+  engine.addItem('id_card');                 // key_item
+  engine.addItem('emotional_support_pickle'); // upgrade
+  const consumables = engine.getConsumables();
+  assert.equal(consumables.length, 1, 'should return only the 1 consumable');
+  assert.equal(consumables[0].itemId, 'triscuit');
+});
+
+test('getConsumables() excludes items with qty 0', () => {
+  engine.init();
+  engine.addItem('triscuit');
+  engine.removeItem('triscuit');
+  const consumables = engine.getConsumables();
+  assert.equal(consumables.length, 0, 'depleted consumable should not appear in getConsumables');
+});
+
+// ─── useItem ─────────────────────────────────────────────────────────────────
+
+test('useItem() returns the item definition object', () => {
+  engine.init();
+  engine.addItem('triscuit');
+  const result = engine.useItem('triscuit');
+  assert.ok(result !== null, 'useItem should return the item, not null');
+  assert.equal(result.id, 'triscuit');
+});
+
+test('useItem() applies restore_hp effect to playerHP', () => {
+  engine.init();
+  engine.setPlayerHP(70);
+  engine.addItem('triscuit'); // effect: restore_hp, value: 5
+  engine.useItem('triscuit');
+  assert.equal(engine.getState().playerHP, 75, 'HP should increase by 5 after using triscuit');
+});
+
+test('useItem() removes the item from inventory after use', () => {
+  engine.init();
+  engine.addItem('triscuit');
+  engine.useItem('triscuit');
+  assert.equal(engine.hasItem('triscuit'), false, 'item should be removed from inventory after use');
+});
+
+test('useItem() returns null when item is not in inventory', () => {
+  engine.init();
+  const result = engine.useItem('triscuit');
+  assert.equal(result, null, 'should return null if item is not in inventory');
+});
+
+test('useItem() with full-restore item (null value) restores HP to 100', () => {
+  engine.init();
+  engine.setPlayerHP(30);
+  engine.addItem('carls_large_cheese_steak_sub'); // effect: restore_hp, value: null
+  engine.useItem('carls_large_cheese_steak_sub');
+  assert.equal(engine.getState().playerHP, 100, 'null HP restore value should fully restore HP');
+});
+
+test('useItem() with boost_exp consumable increases expBoost', () => {
+  engine.init();
+  engine.addItem('dreamy_ramen'); // effect: boost_exp, value: 15
+  engine.useItem('dreamy_ramen');
+  assert.equal(engine.getState().expBoost, 15, 'expBoost should increase by 15 after using dreamy_ramen');
+});
+
+test('useItem() with boost_attack consumable increases damageBuff', () => {
+  engine.init();
+  const before = engine.getState().damageBuff;
+  engine.addItem('large_coffee'); // effect: boost_attack, value: 15
+  engine.useItem('large_coffee');
+  assert.equal(engine.getState().damageBuff, before + 15, 'damageBuff should increase by 15 after using large_coffee');
+});
+
+test('useItem() with boost_defense consumable increases defenseStat', () => {
+  engine.init();
+  const before = engine.getState().defenseStat;
+  engine.addItem('pms_peanut_butter_cup'); // effect: boost_defense, value: 15
+  engine.useItem('pms_peanut_butter_cup');
+  assert.equal(engine.getState().defenseStat, before + 15, 'defenseStat should increase by 15 after using peanut butter cup');
+});
+
+// ─── awardXP with expBoost ────────────────────────────────────────────────────
+
+test('awardXP() includes expBoost in the total and resets it to 0', () => {
+  engine.init();
+  engine.addItem('dreamy_ramen'); // boost_exp: 15
+  engine.useItem('dreamy_ramen');
+  engine.awardXP(30);
+  assert.equal(engine.getState().xp, 45, 'XP should be 30 base + 15 boost = 45');
+  assert.equal(engine.getState().expBoost, 0, 'expBoost should be reset to 0 after awardXP');
+});
+
+test('awardXP() with no expBoost behaves as before', () => {
+  engine.init();
+  engine.awardXP(30);
+  assert.equal(engine.getState().xp, 30, 'XP should be exactly 30 with no boost');
+});
+
+// ─── addDamageBuff / addDefenseStat ──────────────────────────────────────────
+
+test('addDamageBuff() increases damageBuff by n', () => {
+  engine.init();
+  engine.addDamageBuff(10);
+  assert.equal(engine.getState().damageBuff, 10);
+});
+
+test('addDamageBuff() is additive with existing damageBuff', () => {
+  engine.init();
+  engine.addDamageBuff(5);
+  engine.addDamageBuff(3);
+  assert.equal(engine.getState().damageBuff, 8);
+});
+
+test('addDefenseStat() increases defenseStat by n', () => {
+  engine.init();
+  engine.addDefenseStat(8);
+  assert.equal(engine.getState().defenseStat, 8);
+});
+
+// ─── inventory persistence across faint ──────────────────────────────────────
+
+test('inventory is preserved when player faints (resetGame does not clear inventory)', () => {
+  engine.init();
+  engine.addItem('triscuit');
+  engine.setPlayerHP(0); // triggers resetGame()
+  assert.ok(engine.hasItem('triscuit'), 'items should survive a faint');
 });

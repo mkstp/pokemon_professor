@@ -5,13 +5,10 @@
 // up to 4 to their active battle loadout. Saves to engine state on exit.
 //
 // Canvas: 400×400 px.
-// Depends on: engine.js (state reads/writes), data/playerMoves.js,
-//             data/professors.js, data/students.js
+// Depends on: engine.js (state reads/writes), data/moves.js
 
 import * as engine        from '../engine.js';
-import { playerMoves }    from '../data/playerMoves.js';
-import { professorMoves } from '../data/professors.js';
-import { npcMoves }       from '../data/students.js';
+import { playerMoves, professorMoves, npcMoves } from '../data/moves.js';
 
 // Unified move lookup across all three tables. IDs are globally unique.
 const ALL_MOVE_MAP = Object.fromEntries(

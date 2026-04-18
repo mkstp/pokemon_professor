@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "bd prime",
+            "command": "[ -d .beads ] && bd prime",
             "type": "command"
           }
         ],
@@ -15,7 +15,11 @@
       {
         "hooks": [
           {
-            "command": "bd prime",
+            "command": "[ -d .beads ] && bd prime",
+            "type": "command"
+          },
+          {
+            "command": "date +%s > .claude/session_start.tmp",
             "type": "command"
           }
         ],

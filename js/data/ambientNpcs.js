@@ -5,6 +5,7 @@
 // Non-battle NPCs encountered in the overworld. Interaction triggers dialogue
 // and optionally gives an item. Schema: see tdd/data.md § AmbientNPC.
 //
+// dialogue: key referencing a sequence in dialogue.js (dialogueSequences).
 // location: placement is TBD — region and tile coordinates will be assigned
 // during map work. Placeholders used here so the schema is complete.
 
@@ -13,9 +14,7 @@ export const ambientNPCs = [
     id: 'npc_casey',
     name: 'Casey',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: [
-      'You\'ve tried enough. You get it.',
-    ],
+    dialogue: 'npc_casey',
     reward: 'meal_lovers_badge',
     repeatableReward: false,
   },
@@ -23,10 +22,7 @@ export const ambientNPCs = [
     id: 'npc_antaeus',
     name: 'Antaeus',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: [
-      'Hungry? Take something.',
-      'There\'s always more.',
-    ],
+    dialogue: 'npc_antaeus',
     // reward: TBD — gives grad lounge food but no specific item id assigned yet
     repeatableReward: true,
   },
@@ -34,9 +30,7 @@ export const ambientNPCs = [
     id: 'npc_clara',
     name: 'Clara',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: [
-      '…',
-    ],
+    dialogue: 'npc_clara',
     reward: 'triscuit',
     repeatableReward: true,
   },
@@ -44,9 +38,7 @@ export const ambientNPCs = [
     id: 'npc_beckett',
     name: 'Beckett',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: [
-      'You look like you need this.',
-    ],
+    dialogue: 'npc_beckett',
     reward: 'emotional_support_pickle',
     repeatableReward: false,
   },
@@ -54,11 +46,7 @@ export const ambientNPCs = [
     id: 'npc_emeryn',
     name: 'Emeryn',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: [
-      'Oh — hi. I wasn\'t expecting anyone.',
-      'Um… do you want a cookie?',
-      'I made too many.',
-    ],
+    dialogue: 'npc_emeryn',
     reward: 'purim_cookie',
     repeatableReward: true,
   },
@@ -66,9 +54,7 @@ export const ambientNPCs = [
     id: 'npc_kyle',
     name: 'Kyle',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: [
-      'You eating right? Doesn\'t look like it.',
-    ],
+    dialogue: 'npc_kyle',
     reward: 'carls_large_cheese_steak_sub',
     repeatableReward: false,
   },
@@ -76,10 +62,7 @@ export const ambientNPCs = [
     id: 'npc_ruby',
     name: 'Ruby',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: [
-      'You\'ve been showing up.',
-      'People notice more than you think.',
-    ],
+    dialogue: 'npc_ruby',
     reward: 'community_badge',
     repeatableReward: false,
   },

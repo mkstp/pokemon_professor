@@ -1,13 +1,19 @@
 ---
 name: implement
-description: Pure development workflow with test-first development and coverage review. Never manages beads issues or commits. Invoke with: "use the implementer to [description of change]".
+description: Development workflow with proportionate testing. Writes tests for behavior changes, skips ceremony for trivial edits, prunes as it goes. Never manages beads issues or commits. Invoke with: "use the implementer to [description of change]".
 ---
 
-# Implementer
+# SKILL: Implement
 
-Follow these phases **in strict order**. Do not skip phases. Do not proceed until the current phase's gate is satisfied.
+## Trigger Conditions
 
-This skill covers development only — no issue tracking, no commits, no pushes. The coordinator handles those.
+Activate when the user: says "implement", "code", "build" or asks to do any work on source code.
+
+---
+
+## Procedure
+
+Follow these phases in order. This skill covers development only — no commits, no pushes.
 
 ## Principles
 
@@ -15,65 +21,61 @@ This skill covers development only — no issue tracking, no commits, no pushes.
 - Mock properly in tests. Do not add production fallbacks to make tests pass.
 - No type casts that bypass the type system.
 - No optional chaining on required properties.
-- **Every production code change requires tests.** No exceptions for migrations, refactors, copy-paste, or "just wiring things up." If you wrote or modified production code, you must write tests for it. Never defer tests to a follow-up issue.
+- Tests exist to catch regressions in behavior users or callers depend on. Write them when they earn their keep; skip them when they don't.
 
-## Phase 1: Write Failing Tests
+## Phase 1: Decide what testing this change needs
 
-Write tests for the behavior you are about to change or add. Do this **before** touching any production code.
+Before touching code, classify the change:
 
-**This phase is NOT optional.** Common excuses that do NOT exempt you from writing tests:
-- "It's just a migration" — migrated code has new integration points that need testing
-- "It's just wiring up an API client" — API client calls, error handling, and auth headers need tests
-- "The old code didn't have tests" — that's a reason to add them, not skip them
-- "I'll add tests later" — no, tests ship with the code, always
+**Behavior change — tests required.** The change adds, modifies, or removes behavior a user or caller depends on: business logic, error handling, data transformations, API contracts, auth/permission logic, persistence behavior, user-visible UI states. Write failing tests before implementing (or, for removals, tests asserting the old behavior is gone — these pass after implementation).
 
-1. Read the relevant production code to understand current behavior
-2. Write new test cases that describe the desired behavior after your change
-3. Run the tests using the appropriate test command (see **Quality Gates** in CLAUDE.md)
+**Non-behavioral change — tests not required.** Pure renames, type-only changes, formatting, dependency bumps with no API surface change, moving code between files without altering it, comment/doc edits. Skip to Phase 2. State your reasoning in the Phase 5 summary.
 
-**Gate:** Your new tests **fail** (or, for pure deletions/removals, you can write tests asserting the old behavior is gone — these will pass after implementation). If your new tests already pass, they are not testing anything new. Rewrite them.
+**Ambiguous — default to writing tests.** If you're unsure which bucket the change falls into, treat it as a behavior change. The cost of a test you didn't strictly need is lower than the cost of a regression.
+
+### If tests are required
+
+1. Read the relevant production code to understand current behavior.
+2. Write tests describing the desired behavior after your change. Prefer one well-targeted integration test over several unit tests that collectively cover the same behavior. Test observable behavior, not implementation details.
+3. Run the tests (see **Quality Gates** in CLAUDE.md).
+
+**Gate:** Your new tests fail against the current code. If they already pass, they aren't testing the change — rewrite them.
 
 ## Phase 2: Implement
 
-Make the production code changes. Keep changes minimal and focused on the task.
+Make the production code changes. Keep them minimal and focused on the task.
 
-## Phase 3: Verify
+## Phase 3: Verify and prune
 
-**Gate:** All tests must pass with zero errors. If any fails, fix the issues before proceeding.
+Run the full test suite. All tests must pass with zero errors.
 
-## Phase 4: Test Coverage Review
+Then prune. Your change may have made existing tests redundant or wrong:
 
-This is an audit, not a formality. Evaluate whether your tests actually cover the changes you made.
+- **Redundant:** an existing test now duplicates coverage your new test provides. Delete the weaker one (usually the older, narrower unit test).
+- **Stale:** a test asserts behavior the change removed or altered. Delete or rewrite it.
+- **Implementation-coupled:** a test breaks because it asserted internal details (private method calls, exact intermediate values) rather than observable behavior. If the behavior is still correct, rewrite the test against the behavior, or delete it if another test already covers the behavior.
 
-### Step 1: List what changed
+Re-run the suite after pruning.
 
-Separate the output into production files and test files.
+**Gate:** All tests pass. The suite is no larger than it needs to be.
 
-### Step 2: For each changed production file, evaluate
+## Phase 4: Coverage audit (conditional)
 
-- **What behavior changed?** (new feature, bug fix, removed feature, refactored logic)
-- **What existing tests cover this file?** Read the corresponding test file if one exists.
-- **Are there gaps?** Specifically:
-  - Happy path for new/changed behavior
-  - Error paths and edge cases
-  - Regression test if this is a bug fix (a test that would have caught the original bug)
-  - Boundary conditions
+Only run this phase if the change touched **core business logic, a layer boundary** (repository, API route, auth flow), **or fixed a bug**. For small localized changes, the Phase 1 tests are sufficient coverage — skip to Phase 5.
 
-### Step 3: Evaluate integration test needs
+If the phase applies:
 
-Integration tests are needed when changes affect:
-- Repository/persistence layer (database queries, data mapping)
-- API routes that combine multiple services
-- Auth flows or permission checks
-- Data flowing across multiple layers
+1. `git diff --name-only` — separate production files from test files.
+2. For each changed production file, check for gaps:
+   - Happy path for new/changed behavior
+   - Error paths and realistic edge cases (not every theoretically possible input)
+   - **Regression test if this is a bug fix** — a test that would have caught the original bug. This is the one coverage check that is never optional for bug fixes.
+   - Integration coverage if the change crosses layers
+3. Fill real gaps. Do not write tests to hit a coverage number or to exercise trivial code (getters, pass-through wiring, config).
 
-If integration tests are needed, write them.
+Re-run the suite.
 
-### Step 4: Fill gaps
-
-Write any missing tests identified above. Then re-run the appropriate quality gate command.
-
-**Gate:** All tests pass, including your new coverage additions. If you identified no gaps in Steps 2-3, document your reasoning (e.g., "Changes were purely deletions; added regression tests in Phase 1 confirming removed elements no longer render").
+**Gate:** All tests pass. Any bug fix has a regression test.
 
 ## Phase 5: Summary
 
@@ -93,8 +95,9 @@ Commit: <full commit hash, or "N/A" on failure>
 ## Files modified
 - <path> — <what changed in 1 phrase>
 
-## Test coverage
-- <1 bullet per test file added/modified, what it covers>
+## Testing
+- <classification from Phase 1: behavior change / non-behavioral / ambiguous>
+- <tests added, modified, or deleted — or "None; non-behavioral change" with 1-sentence reasoning>
 
 ## Concerns
 - <anything the coordinator should know, or "None">

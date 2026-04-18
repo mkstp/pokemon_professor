@@ -44,11 +44,14 @@ export default class BattleModeScene extends Phaser.Scene {
     this.scene.launch('AudioScene');
     // AudioScene.create() populates this.tracks asynchronously after preload completes.
     // Listening on its 'create' event guarantees tracks are ready before we try to play.
+    this._pendingUnlock = null;
     this.scene.get('AudioScene').events.once('create', () => {
       if (this.sound.locked) {
-        this.sound.once('unlocked', () => {
+        this._pendingUnlock = () => {
+          this._pendingUnlock = null;
           this.scene.get('AudioScene').switchTo('intro_credits');
-        });
+        };
+        this.sound.once('unlocked', this._pendingUnlock);
       } else {
         this.scene.get('AudioScene').switchTo('intro_credits');
       }
@@ -62,7 +65,10 @@ export default class BattleModeScene extends Phaser.Scene {
     this._studPage = 0;
     engine.init();
     const audio = this.scene.get('AudioScene');
-    if (audio) audio.switchTo('intro_credits');
+    if (audio) {
+      audio.stop();
+      audio.switchTo('intro_credits');
+    }
     this._buildUI();
   }
 
@@ -177,6 +183,10 @@ export default class BattleModeScene extends Phaser.Scene {
   // Sleeps this scene and launches BattleScene with the chosen opponent data.
   // data must include opponentType and either professorId or studentId.
   _startBattle(data) {
+    if (this._pendingUnlock) {
+      this.sound.off('unlocked', this._pendingUnlock);
+      this._pendingUnlock = null;
+    }
     this.scene.launch('BattleScene', data);
     this.scene.sleep('OverworldScene');
   }

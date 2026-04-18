@@ -8,12 +8,14 @@
 //
 // Canvas: 400×400 px (defined in game.js config; debug.html uses 400×900).
 // Depends on: engine.js (state reads/writes), data/professors.js,
-//             data/students.js, data/playerMoves.js
+//             data/students.js, data/moves.js
 
 import * as engine from '../engine.js';
-import { professors, professorMoves } from '../data/professors.js';
-import { studentNPCs, npcMoves }      from '../data/students.js';
-import { playerMoves }                from '../data/playerMoves.js';
+import { professors }                            from '../data/professors.js';
+import { studentNPCs }                           from '../data/students.js';
+import { playerMoves, professorMoves, npcMoves } from '../data/moves.js';
+import { items }                                 from '../data/items.js';
+import { applyDeferredDamage, applyPlayerMove, applyOpponentTurn } from './battle/resolver.js';
 
 // --- Layout constants (canvas pixels) ---
 
@@ -66,10 +68,6 @@ const LOG_Y = UI_PANEL_Y + 12;
 const HP_ANIM_MS = 1200;
 // Brief pause after an HP animation completes before the next step begins (ms).
 const HP_POST_PAUSE = 500;
-
-// Lookup maps: move id → move object. Built once at module load.
-const PROF_MOVE_MAP = Object.fromEntries(professorMoves.map(m => [m.id, m]));
-const NPC_MOVE_MAP  = Object.fromEntries(npcMoves.map(m => [m.id, m]));
 
 // Unified move lookup across all three tables. IDs are globally unique, so merging is safe.
 // Used to resolve activeMoves IDs to move objects regardless of which table they originated from.
@@ -165,8 +163,10 @@ export default class BattleScene extends Phaser.Scene {
       professorHP:          prof.hp,
       playerMoves:          activeMoves,
       selectedMoveIndex:    0,
-      menuLevel:            'action', // 'action' | 'moves'
+      menuLevel:            'action', // 'action' | 'moves' | 'items'
       selectedActionIndex:  0,
+      selectedItemIndex:    0,
+      itemScrollOffset:     0,
       phase:                'select', // 'select' | 'resolve' | 'animating' | 'end' | 'done'
       outcome:              null,     // null | 'win' | 'loss' | 'fled'
       disrupted:            false,
@@ -253,6 +253,20 @@ export default class BattleScene extends Phaser.Scene {
       wordWrap: { width: 170 },
     }).setVisible(false);
 
+    // --- Item menu: four Text objects (same positions as moveTexts), hidden until player
+    // selects Item from the action menu. Shows consumable items in inventory.
+    this.itemTexts = [0, 1, 2, 3].map(i =>
+      this.add.text(MOVE_X, MOVE_Y_BASE + i * MOVE_STEP, '', {
+        fontSize: '13px', fill: '#222266', fontFamily: 'monospace',
+      }).setVisible(false)
+    );
+
+    // --- Item description: shown in the right panel when the item submenu is open.
+    this.itemDescText = this.add.text(205, MOVE_Y_BASE, '', {
+      fontSize: '11px', fill: '#443300', fontFamily: 'monospace',
+      wordWrap: { width: 170 },
+    }).setVisible(false);
+
     // --- Battle log: replaces the move menu during turn resolution ---
     this.battleLogText = this.add.text(LOG_X, LOG_Y, '', {
       fontSize: '13px', fill: '#443300', fontFamily: 'monospace',
@@ -280,6 +294,14 @@ export default class BattleScene extends Phaser.Scene {
         this.battleState.selectedActionIndex =
           (this.battleState.selectedActionIndex - 1 + ACTIONS.length) % ACTIONS.length;
         this.renderActionMenu();
+      } else if (this.battleState.menuLevel === 'items') {
+        if (this.battleState.selectedItemIndex > 0) {
+          this.battleState.selectedItemIndex--;
+          if (this.battleState.selectedItemIndex < this.battleState.itemScrollOffset) {
+            this.battleState.itemScrollOffset--;
+          }
+          this.renderItemMenu();
+        }
       } else {
         const len = this.battleState.playerMoves.length;
         this.battleState.selectedMoveIndex =
@@ -294,6 +316,15 @@ export default class BattleScene extends Phaser.Scene {
         this.battleState.selectedActionIndex =
           (this.battleState.selectedActionIndex + 1) % ACTIONS.length;
         this.renderActionMenu();
+      } else if (this.battleState.menuLevel === 'items') {
+        const consumables = engine.getConsumables();
+        if (this.battleState.selectedItemIndex < consumables.length - 1) {
+          this.battleState.selectedItemIndex++;
+          if (this.battleState.selectedItemIndex >= this.battleState.itemScrollOffset + 4) {
+            this.battleState.itemScrollOffset++;
+          }
+          this.renderItemMenu();
+        }
       } else {
         const len = this.battleState.playerMoves.length;
         this.battleState.selectedMoveIndex =
@@ -324,11 +355,13 @@ export default class BattleScene extends Phaser.Scene {
           // Run.
           this.flee();
         } else {
-          // Item — not yet implemented.
-          this._showNoItems();
+          // Item — open item submenu.
+          this._openItemMenu();
         }
-      } else {
+      } else if (this.battleState.menuLevel === 'moves') {
         this.selectMove(this.battleState.selectedMoveIndex);
+      } else if (this.battleState.menuLevel === 'items') {
+        this._confirmItemUse();
       }
     };
     keys.enter.on('down', confirmMove);
@@ -338,6 +371,11 @@ export default class BattleScene extends Phaser.Scene {
       if (this.battleState.phase !== 'select') return;
       if (this.battleState.menuLevel === 'moves') {
         // ESC from move submenu → back to action menu.
+        this.battleState.menuLevel = 'action';
+        this._setUIMode('action');
+        this.renderActionMenu();
+      } else if (this.battleState.menuLevel === 'items') {
+        // ESC from item submenu → back to action menu.
         this.battleState.menuLevel = 'action';
         this._setUIMode('action');
         this.renderActionMenu();
@@ -408,17 +446,17 @@ export default class BattleScene extends Phaser.Scene {
     const animP  = (f, t) => seq.push(next => this._animateProfHP(f, t, next));
     const animPl = (f, t) => seq.push(next => this._animatePlayerHP(f, t, next));
 
-    const ctx = { bs, seq, text, animP, animPl };
+    const ctx = { bs, seq, text, animP, animPl, opponentType: this.opponentType, opponentId: this.opponentId };
 
     // 1. Apply any deferred professor damage from the previous turn.
-    if (this._applyDeferredDamage(ctx)) return this._endSeq(seq, 'loss');
+    if (applyDeferredDamage(ctx)) return this._endSeq(seq, 'loss');
 
     // 2-5. Apply player move and check for win/loss.
-    const playerResult = this._applyPlayerMove(ctx);
+    const playerResult = applyPlayerMove(ctx);
     if (playerResult) return this._endSeq(seq, playerResult);
 
     // 6. Apply opponent's turn and check for win/loss.
-    const profResult = this._applyOpponentTurn(ctx);
+    const profResult = applyOpponentTurn(ctx);
     if (profResult) return this._endSeq(seq, profResult);
 
     // 7. Turn complete — run the visual sequence, then return to the action menu.
@@ -429,419 +467,6 @@ export default class BattleScene extends Phaser.Scene {
       this._setUIMode('action');
       this.renderActionMenu();
     });
-  }
-
-  // Applies any damage deferred from the previous professor turn (deferred effect).
-  // Pushes a text line and player HP animation to ctx.seq.
-  // Returns true if the player faints (loss condition); false otherwise.
-  _applyDeferredDamage({ bs, text, animPl }) {
-    if (bs.deferredDamage <= 0) return false;
-
-    const dmg  = bs.deferredDamage;
-    bs.deferredDamage = 0;
-    const fromHP = engine.getState().playerHP;
-    const toHP   = fromHP - dmg;
-    engine.setPlayerHP(toHP);
-    bs.lastProfessorDamage = dmg;
-    text(`The deferred effect hits! You take ${dmg} damage.`);
-    animPl(fromHP, Math.max(0, toHP));
-
-    return toHP <= 0;
-  }
-
-  // Applies the player's selected move: calculates damage, mutates professorHP,
-  // and handles all player move effects via the effect switch.
-  // Pushes text and HP animation steps to ctx.seq.
-  // Returns 'win' if the opponent is defeated, 'loss' if recoil kills the player,
-  // or null if the turn continues.
-  _applyPlayerMove({ bs, text, animP, animPl }) {
-    // If the NPC disrupted the player this turn, skip the player's action.
-    if (bs.playerSkipped) {
-      bs.playerSkipped = false;
-      text('You are disrupted and skip your action!');
-      return null;
-    }
-
-    const move = bs.playerMoves[bs.selectedMoveIndex];
-
-    // 'counter': deals 40 damage if the opponent's last move dealt ≥ 30.
-    let playerDamage = (move.effect === 'counter' && bs.lastProfessorDamage >= 30)
-      ? 40
-      : move.damage;
-
-    // Flat damage bonus from player level-ups.
-    playerDamage += engine.getState().damageBuff;
-
-    // Flat damage reduction from NPC 'reduce_next_10' or 'heal_and_reduce_next'.
-    if (bs.playerReducedNext10 > 0) {
-      playerDamage = Math.max(0, playerDamage - bs.playerReducedNext10);
-      bs.playerReducedNext10 = 0;
-    }
-
-    // 'disrupted': player's damage is halved this turn; flag resets after use.
-    if (bs.disrupted) {
-      playerDamage = Math.floor(playerDamage / 2);
-      bs.disrupted = false;
-    }
-
-    // Track last player damage for NPC 'conditional_damage' check next turn.
-    bs.lastPlayerDamage = playerDamage;
-
-    // NPC vulnerability bonus: NPC took a high-cost move and is exposed.
-    if (bs.npcVulnTurns > 0) {
-      playerDamage += 5;
-      bs.npcVulnTurns--;
-    }
-
-    // NPC shield: NPC used heal_and_shield; next incoming damage is halved.
-    if (bs.npcIncomingHalved) {
-      playerDamage = Math.floor(playerDamage / 2);
-      bs.npcIncomingHalved = false;
-    }
-
-    const fromProfHP = bs.professorHP;
-    bs.professorHP   = Math.max(0, bs.professorHP - playerDamage);
-    text(`You use ${move.name}! Deals ${playerDamage} damage.`);
-    animP(fromProfHP, bs.professorHP);
-
-    // Apply any additional effect from the player move.
-    switch (move.effect) {
-      case 'skip':
-        bs.professorSkipped = true;
-        text(`${bs.professor.name} is stunned — skips their next turn.`);
-        break;
-      case 'player_recoil': {
-        const from  = engine.getState().playerHP;
-        const newHP = from - 10;
-        engine.setPlayerHP(newHP);
-        text('You take 10 recoil damage.');
-        animPl(from, Math.max(0, newHP));
-        if (newHP <= 0) {
-          text('You fainted from recoil!');
-          return 'loss';
-        }
-        break;
-      }
-      case 'clear_debuff':
-        bs.disrupted = false;
-        text('Disruption effect cleared!');
-        break;
-      case 'halve_next':
-        bs.professorHalved = true;
-        text(`${bs.professor.name}'s next move will deal half damage.`);
-        break;
-      // 'counter' and null require no additional action here.
-    }
-
-    // Check win condition (opponent HP depleted).
-    if (bs.professorHP <= 0) {
-      if (this.opponentType === 'professor') engine.defeatProfessor(this.opponentId);
-      text(`${bs.professor.name} is defeated!`);
-      return 'win';
-    }
-
-    return null;
-  }
-
-  // Applies the opponent's turn: picks a random move and resolves its effect.
-  // Works for both professors (using PROF_MOVE_MAP) and student NPCs (NPC_MOVE_MAP).
-  // Pushes text and HP animation steps to ctx.seq.
-  // Returns 'loss' if the player faints, 'win' if the opponent faints from a
-  // recoil or mutual effect, or null if the turn continues normally.
-  _applyOpponentTurn({ bs, text, animP, animPl }) {
-    // NPC's own exhaustion skip (from skip_self / skip_self_2 effects).
-    if (bs.npcSkippedTurns > 0) {
-      bs.npcSkippedTurns--;
-      text(`${bs.professor.name} is exhausted and does nothing.`);
-      return null;
-    }
-
-    // Player-applied skip (from player move 'skip' effect, or NPC skip_opponent on prior turn).
-    if (bs.professorSkipped) {
-      bs.professorSkipped = false;
-      text(`${bs.professor.name} is stunned and does nothing.`);
-      return null;
-    }
-
-    // Select a move from the opponent's pool at random.
-    const moveMap   = this.opponentType === 'student' ? NPC_MOVE_MAP : PROF_MOVE_MAP;
-    const moveIds   = bs.professor.moves;
-    const oppMoveId = moveIds[Math.floor(Math.random() * moveIds.length)];
-    const oppMove   = moveMap[oppMoveId];
-
-    // Professor-only: deferred effect stores damage for next turn.
-    if (oppMove.effect === 'deferred') {
-      bs.deferredDamage      = oppMove.damage;
-      bs.lastProfessorDamage = 0;
-      text(`${bs.professor.name} uses ${oppMove.name}. The effect is delayed...`);
-      return null;
-    }
-
-    // Base damage for this move.
-    let profDamage = oppMove.damage;
-
-    // Player-applied halve (from player 'halve_next' effect).
-    if (bs.professorHalved) {
-      profDamage         = Math.floor(profDamage / 2);
-      bs.professorHalved = false;
-      text(`${bs.professor.name}'s move is weakened!`);
-    }
-
-    // NPC self-applied damage modifiers.
-    if (bs.npcDoubledNext) {
-      profDamage      *= 2;
-      bs.npcDoubledNext = false;
-    }
-    if (bs.npcHalvedNext) {
-      profDamage    = Math.floor(profDamage / 2);
-      bs.npcHalvedNext = false;
-    }
-    if (bs.npcBoostNext10) {
-      profDamage   += 10;
-      bs.npcBoostNext10 = false;
-    }
-    if (bs.npcBoostedTurns > 0) {
-      profDamage += 20;
-      bs.npcBoostedTurns--;
-    }
-
-    // mutual_damage_20: both sides take 20. Override profDamage so the main damage
-    // block handles the player's 20 HP; the switch case handles the NPC's 20 HP.
-    if (oppMove.effect === 'mutual_damage_20') profDamage = 20;
-
-    // Pre-damage rolls: chance_fail and chance_bonus_10 modify profDamage before it lands.
-    if (oppMove.effect === 'chance_fail' && Math.random() < 0.2) {
-      profDamage = 0;
-    }
-    if (oppMove.effect === 'chance_bonus_10' && Math.random() < 0.3) {
-      profDamage += 10;
-    }
-    // conditional_damage: deal 40 if the player's last move dealt ≥ 30.
-    if (oppMove.effect === 'conditional_damage' && bs.lastPlayerDamage >= 30) {
-      profDamage = 40;
-    }
-
-    // Flat damage reduction from player level-ups (minimum 0 net damage).
-    profDamage = Math.max(0, profDamage - engine.getState().defenseStat);
-
-    // Deal damage to player.
-    const fromPHP = engine.getState().playerHP;
-    const toPHP   = fromPHP - profDamage;
-    engine.setPlayerHP(toPHP);
-    bs.lastProfessorDamage = profDamage;
-    if (profDamage > 0) {
-      text(`${bs.professor.name} uses ${oppMove.name}! Deals ${profDamage} damage.`);
-    } else {
-      text(`${bs.professor.name} uses ${oppMove.name}!`);
-    }
-    animPl(fromPHP, Math.max(0, toPHP));
-
-    // Apply the move's effect.
-    switch (oppMove.effect) {
-
-      // ── Professor-only effects ────────────────────────────────────────────────
-      case 'disrupt':
-        bs.disrupted = true;
-        text('Your next move will deal half damage!');
-        break;
-
-      case 'self_damage': {
-        // Professor: 25% recoil. Student NPC: flat 10 self-damage.
-        const recoil   = this.opponentType === 'student' ? 10 : Math.floor(oppMove.damage * 0.25);
-        const fromPH   = bs.professorHP;
-        bs.professorHP = Math.max(0, bs.professorHP - recoil);
-        text(`${bs.professor.name} takes ${recoil} recoil damage.`);
-        animP(fromPH, bs.professorHP);
-        if (bs.professorHP <= 0) {
-          if (this.opponentType === 'professor') engine.defeatProfessor(this.opponentId);
-          text(`${bs.professor.name} faints from recoil!`);
-          return 'win';
-        }
-        break;
-      }
-
-      // ── Student NPC effects ───────────────────────────────────────────────────
-      case 'skip_opponent':
-        bs.playerSkipped = true;
-        text("You are disrupted — you'll skip your next action!");
-        break;
-
-      case 'chance_skip_opponent':
-        if (Math.random() < 0.5) {
-          bs.playerSkipped = true;
-          text("You are disrupted — you'll skip your next action!");
-        } else {
-          text('The disruption attempt failed.');
-        }
-        break;
-
-      case 'halve_next':
-        // From NPC's perspective: opponent (player) next move halved.
-        bs.disrupted = true;
-        text('Your next move will deal half damage!');
-        break;
-
-      case 'chance_halve_opponent':
-        if (Math.random() < 0.25) {
-          bs.disrupted = true;
-          text('Your next move will deal half damage!');
-        }
-        break;
-
-      case 'conditional_damage':
-        // Damage modification handled pre-damage above; no additional state needed.
-        break;
-
-      case 'clear_debuff':
-        bs.npcHalvedNext  = false;
-        bs.npcDoubledNext = false;
-        text(`${bs.professor.name} clears their debuffs.`);
-        break;
-
-      case 'heal': {
-        const healAmt    = oppMove.healAmount ?? 0;
-        const oldHP      = bs.professorHP;
-        bs.professorHP   = Math.min(bs.professor.hp, bs.professorHP + healAmt);
-        const gained     = bs.professorHP - oldHP;
-        text(`${bs.professor.name} recovers ${gained} HP.`);
-        animP(oldHP, bs.professorHP);
-        break;
-      }
-
-      case 'heal_and_reduce_next': {
-        const healAmt    = oppMove.healAmount ?? 0;
-        const oldHP      = bs.professorHP;
-        bs.professorHP   = Math.min(bs.professor.hp, bs.professorHP + healAmt);
-        const gained     = bs.professorHP - oldHP;
-        bs.playerReducedNext10 += 10;
-        text(`${bs.professor.name} recovers ${gained} HP. Your next move is weakened.`);
-        animP(oldHP, bs.professorHP);
-        break;
-      }
-
-      case 'heal_and_shield': {
-        const healAmt    = oppMove.healAmount ?? 0;
-        const oldHP      = bs.professorHP;
-        bs.professorHP   = Math.min(bs.professor.hp, bs.professorHP + healAmt);
-        const gained     = bs.professorHP - oldHP;
-        bs.npcIncomingHalved = true;
-        text(`${bs.professor.name} recovers ${gained} HP and braces for impact.`);
-        animP(oldHP, bs.professorHP);
-        break;
-      }
-
-      case 'reduce_next_10':
-        bs.playerReducedNext10 += 10;
-        text('Your next move is weakened.');
-        break;
-
-      case 'self_vuln_next':
-        bs.npcVulnTurns = Math.max(bs.npcVulnTurns, 1);
-        break; // self-debuff; no player-facing text
-
-      case 'self_vuln_2':
-        bs.npcVulnTurns = Math.max(bs.npcVulnTurns, 2);
-        break;
-
-      case 'double_next':
-        bs.npcDoubledNext = true;
-        text(`${bs.professor.name} charges up for a powerful next move!`);
-        break;
-
-      case 'skip_self':
-        bs.npcSkippedTurns = Math.max(bs.npcSkippedTurns, 1);
-        break; // exhaustion; NPC-internal state
-
-      case 'skip_self_2':
-        bs.npcSkippedTurns = Math.max(bs.npcSkippedTurns, 2);
-        break;
-
-      case 'halve_self_next':
-        bs.npcHalvedNext = true;
-        break;
-
-      case 'clear_buffs':
-        bs.disrupted           = false;
-        bs.playerReducedNext10 = 0;
-        text('Your buffs are stripped away.');
-        break;
-
-      case 'nullify_last_buff':
-        bs.disrupted = false;
-        text('Your last buff is nullified!');
-        break;
-
-      case 'chance_boost_next_10':
-        if (Math.random() < 0.5) bs.npcBoostNext10 = true;
-        break;
-
-      case 'boost_next_2':
-        bs.npcBoostedTurns = 2;
-        text(`${bs.professor.name} enters a flow state!`);
-        break;
-
-      case 'chance_fail':
-        // Roll handled pre-damage above; no post-damage state needed.
-        break;
-
-      case 'chance_bonus_10':
-        // Roll handled pre-damage above; no post-damage state needed.
-        break;
-
-      case 'mutual_damage_20': {
-        const fromPH2  = bs.professorHP;
-        bs.professorHP = Math.max(0, bs.professorHP - 20);
-        text(`${bs.professor.name} also takes 20 damage!`);
-        animP(fromPH2, bs.professorHP);
-        if (bs.professorHP <= 0) {
-          if (this.opponentType === 'professor') engine.defeatProfessor(this.opponentId);
-          text(`${bs.professor.name} faints!`);
-          return 'win';
-        }
-        break;
-      }
-
-      case 'chain_hit_3': {
-        // First hit already applied above. Each additional hit has 50% chance (max 2 more).
-        let extraHits = 0;
-        while (extraHits < 2 && Math.random() < 0.5) {
-          const fromPH3 = engine.getState().playerHP;
-          const toPH3   = fromPH3 - oppMove.damage;
-          engine.setPlayerHP(toPH3);
-          bs.lastProfessorDamage += oppMove.damage;
-          animPl(fromPH3, Math.max(0, toPH3));
-          extraHits++;
-          if (toPH3 <= 0) {
-            text(`Hit ${extraHits + 1} — you fainted!`);
-            return 'loss';
-          }
-        }
-        if (extraHits > 0) text(`Hit ${extraHits + 1} times!`);
-        break;
-      }
-
-      // ── Stubbed effects (full implementation tracked in separate issues) ──────
-      case 'swap_effect':
-        // stub — test_project-umf: Fully implement swap_effect
-        text(`${bs.professor.name} attempts to redirect — nothing happens.`);
-        break;
-
-      case 'priority':
-        // stub — test_project-u5n: Fully implement priority
-        break;
-
-      case 'reveal_next':
-        // stub — test_project-aqz: Fully implement reveal_next
-        text(`${bs.professor.name} studies your moves carefully.`);
-        break;
-    }
-
-    if (toPHP <= 0) {
-      text('You fainted!');
-      return 'loss';
-    }
-
-    return null;
   }
 
   // Exits the battle without resolution. The professor is not defeated.
@@ -958,10 +583,13 @@ export default class BattleScene extends Phaser.Scene {
     const showAction = mode === 'action';
     const showMoves  = mode === 'moves';
     const showLog    = mode === 'log';
+    const showItems  = mode === 'items';
     this.actionTexts.forEach(t => t.setVisible(showAction));
     this.moveTexts.forEach(t => t.setVisible(showMoves));
     this.moveDescText.setVisible(showMoves);
     this.battleLogText.setVisible(showLog);
+    this.itemTexts.forEach(t => t.setVisible(showItems));
+    this.itemDescText.setVisible(showItems);
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────
@@ -1044,11 +672,111 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // Briefly displays "You have no items!" in the log area, then returns to the
-  // action menu. Used when the player selects Item with no items available.
+  // action menu. Used when the player selects Item with no consumables available.
   _showNoItems() {
     this._setUIMode('log');
     this.battleLogText.setText('You have no items!');
     this.time.delayedCall(1200, () => {
+      this._setUIMode('action');
+      this.renderActionMenu();
+    });
+  }
+
+  // Opens the item submenu. If no consumables in inventory, shows the no-items
+  // message and returns immediately. Otherwise switches to the items UI.
+  _openItemMenu() {
+    const consumables = engine.getConsumables();
+    if (consumables.length === 0) {
+      this._showNoItems();
+      return;
+    }
+    this.battleState.menuLevel        = 'items';
+    this.battleState.selectedItemIndex = 0;
+    this.battleState.itemScrollOffset  = 0;
+    this._setUIMode('items');
+    this.renderItemMenu();
+  }
+
+  // Renders up to 4 item entries with cursor, respecting the current scroll offset.
+  // The right panel shows the flavourText of the highlighted item (or its name if none).
+  renderItemMenu() {
+    const consumables = engine.getConsumables();
+    const offset   = this.battleState.itemScrollOffset;
+    const selected = this.battleState.selectedItemIndex;
+
+    for (let i = 0; i < 4; i++) {
+      const globalIdx = offset + i;
+      if (globalIdx < consumables.length) {
+        const { itemId, qty } = consumables[globalIdx];
+        const itemDef = items.find(it => it.id === itemId);
+        const cursor  = globalIdx === selected ? '> ' : '  ';
+        this.itemTexts[i].setText(`${cursor}${itemDef.name} ×${qty}`);
+      } else {
+        this.itemTexts[i].setText('');
+      }
+    }
+
+    const { itemId } = consumables[selected];
+    const itemDef = items.find(it => it.id === itemId);
+    this.itemDescText.setText(itemDef.flavourText ?? itemDef.name);
+  }
+
+  // Called when the player confirms item selection in the items submenu.
+  // Looks up the selected item definition and delegates to _useItemInBattle.
+  _confirmItemUse() {
+    const consumables = engine.getConsumables();
+    if (consumables.length === 0) return;
+    const { itemId } = consumables[this.battleState.selectedItemIndex];
+    const item = items.find(it => it.id === itemId);
+    this._setUIMode('log');
+    this._useItemInBattle(item);
+  }
+
+  // Returns a human-readable description of an item's effect for the battle log.
+  _itemEffectMessage(item) {
+    const { action, value } = item.effect;
+    switch (action) {
+      case 'restore_hp':  return value === null ? 'Fully restored HP!' : `Restored ${value} HP!`;
+      case 'boost_attack':  return `Attack boosted by ${value}!`;
+      case 'boost_defense': return `Defense boosted by ${value}!`;
+      case 'boost_exp':     return 'EXP gain boosted!';
+      default:              return 'Used!';
+    }
+  }
+
+  // Resolves an item-use turn: applies the item's effect, shows a log message,
+  // animates the HP bar if HP changed, then hands off to the opponent's turn.
+  // Mirrors the structure of resolveTurn() but replaces the player move with item use.
+  _useItemInBattle(item) {
+    this.battleState.phase = 'animating';
+    const bs  = this.battleState;
+    const seq = [];
+    const text   = msg    => seq.push(next => this._showLine(msg, next));
+    const animP  = (f, t) => seq.push(next => this._animateProfHP(f, t, next));
+    const animPl = (f, t) => seq.push(next => this._animatePlayerHP(f, t, next));
+    const ctx = { bs, seq, text, animP, animPl, opponentType: this.opponentType, opponentId: this.opponentId };
+
+    // Apply any deferred professor damage from the previous turn.
+    if (applyDeferredDamage(ctx)) return this._endSeq(seq, 'loss');
+
+    // Apply item effect and queue the log message.
+    const fromHP = engine.getState().playerHP;
+    engine.useItem(item.id);
+    const toHP = engine.getState().playerHP;
+    text(`You used ${item.name}! ${this._itemEffectMessage(item)}`);
+    if (item.effect.action === 'restore_hp' && toHP !== fromHP) {
+      animPl(fromHP, toHP);
+    }
+
+    // Opponent takes their turn.
+    const profResult = applyOpponentTurn(ctx);
+    if (profResult) return this._endSeq(seq, profResult);
+
+    // Run the visual sequence, then return to the action menu.
+    this._runSequence(seq, () => {
+      bs.phase = 'select';
+      bs.menuLevel = 'action';
+      bs.selectedActionIndex = 0;
       this._setUIMode('action');
       this.renderActionMenu();
     });

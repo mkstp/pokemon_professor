@@ -308,4 +308,31 @@ export const dialogueSequences = {
     { speaker: 'Suzanna', line: 'To the details, to the differences.' },
     { speaker: 'Suzanna', line: 'That kind of listening stays with you.' },
   ],
+
+  // ── Ambient NPCs ─────────────────────────────────────────────────────────
+  'npc_casey': [
+    { speaker: 'Casey', line: 'You\'ve tried enough. You get it.' },
+  ],
+  'npc_antaeus': [
+    { speaker: 'Antaeus', line: 'Hungry? Take something.' },
+    { speaker: 'Antaeus', line: 'There\'s always more.' },
+  ],
+  'npc_clara': [
+    { speaker: 'Clara', line: '…' },
+  ],
+  'npc_beckett': [
+    { speaker: 'Beckett', line: 'You look like you need this.' },
+  ],
+  'npc_emeryn': [
+    { speaker: 'Emeryn', line: 'Oh — hi. I wasn\'t expecting anyone.' },
+    { speaker: 'Emeryn', line: 'Um… do you want a cookie?' },
+    { speaker: 'Emeryn', line: 'I made too many.' },
+  ],
+  'npc_kyle': [
+    { speaker: 'Kyle', line: 'You eating right? Doesn\'t look like it.' },
+  ],
+  'npc_ruby': [
+    { speaker: 'Ruby', line: 'You\'ve been showing up.' },
+    { speaker: 'Ruby', line: 'People notice more than you think.' },
+  ],
 };

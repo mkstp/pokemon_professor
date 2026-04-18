@@ -13,9 +13,7 @@
 import './phaser-stub.js';
 import { test, assert } from './runner.js';
 import MoveKioskScene from '../js/scenes/MoveKioskScene.js';
-import { playerMoves }    from '../js/data/playerMoves.js';
-import { professorMoves } from '../js/data/professors.js';
-import { npcMoves }       from '../js/data/students.js';
+import { playerMoves, professorMoves, npcMoves } from '../js/data/moves.js';
 import * as engine from '../js/engine.js';
 
 // Replicate MoveKioskScene's internal ALL_MOVE_MAP so tests can resolve move objects.
@@ -23,7 +21,7 @@ const ALL_MOVE_MAP = Object.fromEntries(
   [...professorMoves, ...npcMoves, ...playerMoves].map(m => [m.id, m])
 );
 
-// Known move IDs from data/playerMoves.js — used as test fixtures.
+// Known move IDs from data/moves.js — used as test fixtures.
 // STARTING_MOVE_IDS in engine.js = ['non_sequitur', 'all_nighter', 'counterexample', 'correction']
 const MOVE_A = 'non_sequitur';     // in STARTING_MOVE_IDS
 const MOVE_B = 'all_nighter';      // in STARTING_MOVE_IDS

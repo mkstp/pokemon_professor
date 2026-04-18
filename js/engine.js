@@ -8,6 +8,7 @@
 
 import { regions }    from './data/regions.js';
 import { professors } from './data/professors.js';
+import { items }      from './data/items.js';
 
 // The five professors who must be defeated to unlock the castle.
 // Excludes both the final boss (prof_vec_tor) and the secret boss (prof_parsemore),
@@ -22,9 +23,8 @@ const STARTING_XP     = 0;
 const XP_PER_LEVEL    = 100; // XP required to reach each successive level
 
 // The 4 moves the player starts with and uses as their default battle loadout.
-// Matches the hardcoded ACTIVE_MOVE_IDS in BattleScene.js until that constant
-// is replaced by engine state (issue test_project-z28).
-const STARTING_MOVE_IDS = ['non_sequitur', 'all_nighter', 'counterexample', 'correction'];
+// IDs must match entries in the playerMoves array in data/moves.js.
+const STARTING_MOVE_IDS = ['impostor_syndrome', 'hot_take', 'non_sequitur', 'undergrad_flashback'];
 
 // Per-level stat gains applied when awardXP() triggers a level-up.
 const DAMAGE_BUFF_PER_LEVEL  = 2; // flat bonus added to all player move damage
@@ -51,6 +51,9 @@ export function init() {
     // Move loadout (3v1)
     learnedMoves:   [...STARTING_MOVE_IDS],       // all move IDs the player has unlocked
     activeMoves:    [...STARTING_MOVE_IDS],        // ordered 4-move battle loadout
+    // Inventory
+    inventory:      [],  // [{ itemId, qty }]
+    expBoost:       0,   // flat XP bonus consumed by the next awardXP() call
   };
 }
 
@@ -114,11 +117,14 @@ export function allProfessorsDefeated() {
   );
 }
 
-// Awards XP to the player. If xp reaches or exceeds xpToNextLevel, triggers a
-// level-up: increments level, carries over the remainder, and bumps damageBuff
-// and defenseStat. Returns true if a level-up occurred, false otherwise.
+// Awards XP to the player. Adds any pending expBoost (from item use) to the
+// award and resets expBoost to 0. If xp reaches or exceeds xpToNextLevel,
+// triggers a level-up: increments level, carries over the remainder, and bumps
+// damageBuff and defenseStat. Returns true if a level-up occurred, false otherwise.
 export function awardXP(amount) {
-  gameState.xp += amount;
+  const total = amount + gameState.expBoost;
+  gameState.expBoost = 0;
+  gameState.xp += total;
   if (gameState.xp >= gameState.xpToNextLevel) {
     gameState.xp          -= gameState.xpToNextLevel;
     gameState.level       += 1;
@@ -140,6 +146,92 @@ export function addLearnedMove(moveId) {
 // Updates the player's active battle loadout to the given ordered array of 4 move IDs.
 export function setActiveMoves(moveIds) {
   gameState.activeMoves = [...moveIds];
+}
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
+// Resolves an item's effect against game state. Private — called by addItem (upgrades)
+// and useItem (consumables). Takes the full item definition object.
+function applyItemEffect(item) {
+  const { action, value } = item.effect;
+  switch (action) {
+    case 'restore_hp':
+      setPlayerHP(value === null ? 100 : gameState.playerHP + value);
+      break;
+    case 'boost_attack':
+      gameState.damageBuff += value;
+      break;
+    case 'boost_defense':
+      gameState.defenseStat += value;
+      break;
+    case 'boost_exp':
+      gameState.expBoost += value;
+      break;
+    // 'unlock', 'none': no state change — key item presence checked via hasItem()
+  }
+}
+
+// Adds one of itemId to inventory. For 'upgrade' category items, applies the
+// effect immediately (permanent session buff). All categories are recorded in
+// inventory so hasItem() can check for key items and badges.
+export function addItem(itemId) {
+  const item = items.find(i => i.id === itemId);
+  if (!item) return;
+  if (item.category === 'upgrade') {
+    applyItemEffect(item);
+  }
+  const entry = gameState.inventory.find(e => e.itemId === itemId);
+  if (entry) {
+    entry.qty += 1;
+  } else {
+    gameState.inventory.push({ itemId, qty: 1 });
+  }
+}
+
+// Removes one quantity of itemId from inventory. No-ops if not present.
+export function removeItem(itemId) {
+  const entry = gameState.inventory.find(e => e.itemId === itemId);
+  if (!entry || entry.qty <= 0) return;
+  entry.qty -= 1;
+}
+
+// Returns true if itemId is in inventory with qty > 0.
+export function hasItem(itemId) {
+  const entry = gameState.inventory.find(e => e.itemId === itemId);
+  return !!(entry && entry.qty > 0);
+}
+
+// Returns all { itemId, qty } inventory entries where category === 'consumable'
+// and qty > 0. Used by BattleScene to build the item selection menu.
+export function getConsumables() {
+  return gameState.inventory.filter(e => {
+    if (e.qty <= 0) return false;
+    const item = items.find(i => i.id === e.itemId);
+    return item && item.category === 'consumable';
+  });
+}
+
+// Uses one quantity of the consumable identified by itemId: applies its effect
+// and removes it from inventory. Returns the item definition so callers can
+// display an appropriate message. Returns null if item is not in inventory.
+export function useItem(itemId) {
+  if (!hasItem(itemId)) return null;
+  const item = items.find(i => i.id === itemId);
+  if (!item || item.category !== 'consumable') return null;
+  applyItemEffect(item);
+  removeItem(itemId);
+  return item;
+}
+
+// Adds n to damageBuff. Exported so item-granting systems can apply attack boosts
+// without going through useItem (e.g. overworld item pickup).
+export function addDamageBuff(n) {
+  gameState.damageBuff += n;
+}
+
+// Adds n to defenseStat. Exported for the same reason as addDamageBuff.
+export function addDefenseStat(n) {
+  gameState.defenseStat += n;
 }
 
 // Resets HP, position, region, and scene to starting values.

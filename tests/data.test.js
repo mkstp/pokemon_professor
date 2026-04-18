@@ -3,10 +3,10 @@
 // All tests are synchronous (data files contain no async operations).
 
 import { test, assert } from './runner.js';
-import { professorMoves, professors }  from '../js/data/professors.js';
-import { playerMoves }                 from '../js/data/playerMoves.js';
-import { npcMoves, studentNPCs }       from '../js/data/students.js';
-import { ambientNPCs }                 from '../js/data/ambientNpcs.js';
+import { professors }                          from '../js/data/professors.js';
+import { playerMoves, professorMoves, npcMoves } from '../js/data/moves.js';
+import { studentNPCs }                         from '../js/data/students.js';
+import { ambientNPCs }                         from '../js/data/ambientNpcs.js';
 import { items }                       from '../js/data/items.js';
 import { TILE, regions }               from '../js/data/regions.js';
 import { dialogueSequences }           from '../js/data/dialogue.js';
@@ -601,16 +601,16 @@ test('every ambientNPC has required fields', () => {
   }
 });
 
-test('every ambientNPC dialogue is a non-empty array of strings', () => {
+test('every ambientNPC dialogue is a non-empty string key referencing dialogueSequences', () => {
   for (const npc of ambientNPCs) {
-    assert.isArray(npc.dialogue, `ambientNPC "${npc.id}" dialogue must be an array`);
-    assert.ok(npc.dialogue.length > 0, `ambientNPC "${npc.id}" dialogue is empty`);
-    for (let i = 0; i < npc.dialogue.length; i++) {
-      assert.ok(
-        typeof npc.dialogue[i] === 'string' && npc.dialogue[i].length > 0,
-        `ambientNPC "${npc.id}" dialogue[${i}] must be a non-empty string`
-      );
-    }
+    assert.ok(
+      typeof npc.dialogue === 'string' && npc.dialogue.length > 0,
+      `ambientNPC "${npc.id}" dialogue must be a non-empty string key`
+    );
+    assert.ok(
+      npc.dialogue in dialogueSequences,
+      `ambientNPC "${npc.id}" dialogue key "${npc.dialogue}" not found in dialogueSequences`
+    );
   }
 });
 

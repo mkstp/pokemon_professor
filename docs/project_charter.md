@@ -25,7 +25,7 @@ pokemon_professor is a standalone browser game built with HTML/CSS/JavaScript. T
 - Weather animations in the overworld (e.g. rain, wind)
 - Retro pixel art visual style throughout
 - Proof-of-concept target: one fully playable end-to-end loop
-- Two-layer code structure with explicit separation: the *data layer* (`js/data/`) is split into domain files (professors, moves, regions, dialogue, etc.) for LLM-context efficiency — each file exports self-contained static data with no logic. The *logic layer* remains flat and non-modular: scene files, engine, and game logic read linearly with no abstractions requiring architectural knowledge. All import paths are explicit; no barrel files or index re-exports exist.
+- Two-layer code structure with explicit separation: the *data layer* (`js/data/`) is split into domain files (professors, moves, regions, dialogue, etc.) for LLM-context efficiency — each file exports self-contained static data with no logic. The *logic layer* is organised for comprehensibility: files should be readable without architectural context, and small files should remain flat and linear. When a logic file grows to the point where its breadth of responsibility makes it difficult to navigate or modify, it may be split along a clear responsibility boundary into a shallow module group (one level deep, no nested hierarchies). Any such split must be justified by reduced cognitive load, not by pattern preference. All import paths are explicit; no barrel files or index re-exports exist.
 - Inline comments throughout explaining the purpose of non-obvious logic
 - **Phaser 3** is the sole approved external library. Vetted on three criteria: (1) necessity — it handles tile rendering, scene management, input, audio, and the game loop, eliminating five categories of manual implementation; (2) documentation quality — comprehensive official documentation and active community; (3) net complexity — it reduces rather than adds complexity for a non-specialist reader, provided the Phaser Scene lifecycle (preload / create / update) is explained once in DESIGN.md. Loaded as a local file; no CDN dependency, no build step. All other external library inclusions remain prohibited unless vetted by the same criteria.
 
@@ -57,7 +57,7 @@ pokemon_professor is a standalone browser game built with HTML/CSS/JavaScript. T
 
 **VC-05:** Any mechanic in the codebase can be located and understood by the project owner without architectural guidance.
 - **Applies to:** Entire codebase
-- **Check method:** Owner selects one mechanic (e.g. battle damage calculation); confirms they can find it, read it, and understand what it does using only the file and its inline comments
+- **Check method:** Owner selects one mechanic (e.g. battle damage calculation); confirms they can find the relevant file by name alone (no map or index required), read the relevant code, and understand what it does using only that file and its inline comments. If the mechanic spans two files, the boundary between them must be self-evident from their names.
 
 **VC-06:** Dialogue triggers and resolves correctly before or after a professor encounter.
 - **Applies to:** Dialogue system
