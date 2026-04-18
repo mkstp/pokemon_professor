@@ -317,8 +317,8 @@ export default class BattleScene extends Phaser.Scene {
           (this.battleState.selectedActionIndex + 1) % ACTIONS.length;
         this.renderActionMenu();
       } else if (this.battleState.menuLevel === 'items') {
-        const consumables = engine.getConsumables();
-        if (this.battleState.selectedItemIndex < consumables.length - 1) {
+        const activeItems = engine.getActiveItems();
+        if (this.battleState.selectedItemIndex < activeItems.length - 1) {
           this.battleState.selectedItemIndex++;
           if (this.battleState.selectedItemIndex >= this.battleState.itemScrollOffset + 4) {
             this.battleState.itemScrollOffset++;
@@ -685,8 +685,8 @@ export default class BattleScene extends Phaser.Scene {
   // Opens the item submenu. If no consumables in inventory, shows the no-items
   // message and returns immediately. Otherwise switches to the items UI.
   _openItemMenu() {
-    const consumables = engine.getConsumables();
-    if (consumables.length === 0) {
+    const activeItems = engine.getActiveItems();
+    if (activeItems.length === 0) {
       this._showNoItems();
       return;
     }
@@ -700,34 +700,31 @@ export default class BattleScene extends Phaser.Scene {
   // Renders up to 4 item entries with cursor, respecting the current scroll offset.
   // The right panel shows the flavourText of the highlighted item (or its name if none).
   renderItemMenu() {
-    const consumables = engine.getConsumables();
+    const activeItems = engine.getActiveItems();
     const offset   = this.battleState.itemScrollOffset;
     const selected = this.battleState.selectedItemIndex;
 
     for (let i = 0; i < 4; i++) {
       const globalIdx = offset + i;
-      if (globalIdx < consumables.length) {
-        const { itemId, qty } = consumables[globalIdx];
-        const itemDef = items.find(it => it.id === itemId);
+      if (globalIdx < activeItems.length) {
+        const itemDef = items.find(it => it.id === activeItems[globalIdx]);
         const cursor  = globalIdx === selected ? '> ' : '  ';
-        this.itemTexts[i].setText(`${cursor}${itemDef.name} ×${qty}`);
+        this.itemTexts[i].setText(`${cursor}${itemDef.name}`);
       } else {
         this.itemTexts[i].setText('');
       }
     }
 
-    const { itemId } = consumables[selected];
-    const itemDef = items.find(it => it.id === itemId);
+    const itemDef = items.find(it => it.id === activeItems[selected]);
     this.itemDescText.setText(itemDef.flavourText ?? itemDef.name);
   }
 
   // Called when the player confirms item selection in the items submenu.
   // Looks up the selected item definition and delegates to _useItemInBattle.
   _confirmItemUse() {
-    const consumables = engine.getConsumables();
-    if (consumables.length === 0) return;
-    const { itemId } = consumables[this.battleState.selectedItemIndex];
-    const item = items.find(it => it.id === itemId);
+    const activeItems = engine.getActiveItems();
+    if (activeItems.length === 0) return;
+    const item = items.find(it => it.id === activeItems[this.battleState.selectedItemIndex]);
     this._setUIMode('log');
     this._useItemInBattle(item);
   }
@@ -761,7 +758,7 @@ export default class BattleScene extends Phaser.Scene {
 
     // Apply item effect and queue the log message.
     const fromHP = engine.getState().playerHP;
-    engine.useItem(item.id);
+    engine.useActiveItem(item.id);
     const toHP = engine.getState().playerHP;
     text(`You used ${item.name}! ${this._itemEffectMessage(item)}`);
     if (item.effect.action === 'restore_hp' && toHP !== fromHP) {

@@ -2,77 +2,46 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pokemon Professor — Dev Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokemon Professor</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #0f0f1a;
-      color: #aaaacc;
-      font-family: monospace;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-    h1 {
-      font-size: 20px;
-      color: #ccccff;
-      letter-spacing: 3px;
-      margin-bottom: 8px;
-    }
-    .sub {
-      font-size: 11px;
-      color: #555577;
-      margin-bottom: 48px;
-    }
-    .menu {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      width: 380px;
-    }
-    a.option {
-      display: block;
-      background: #1a1a2e;
-      border: 1px solid #2a2a4a;
-      padding: 16px 20px;
-      text-decoration: none;
-      cursor: pointer;
-    }
-    a.option:hover {
-      background: #2a2a4a;
-      border-color: #5555aa;
-    }
-    .option-title {
-      display: block;
-      font-size: 14px;
-      color: #ccccff;
-      margin-bottom: 5px;
-    }
-    .option-desc {
-      display: block;
-      font-size: 11px;
-      color: #666688;
-    }
+    body { background: #0f0f1a; display: flex; justify-content: center; align-items: flex-start; padding-top: 20px; min-height: 100vh; }
   </style>
 </head>
 <body>
-  <h1>POKEMON PROFESSOR</h1>
-  <p class="sub">dev hub</p>
-  <nav class="menu">
-    <a class="option" href="game.html">
-      <span class="option-title">▶  Full Game</span>
-      <span class="option-desc">Start from the overworld — the complete game loop</span>
-    </a>
-    <a class="option" href="debug.html">
-      <span class="option-title">⚔  Battle Mode</span>
-      <span class="option-desc">Select any professor or student and jump straight into battle</span>
-    </a>
-    <a class="option" href="tests/index.html">
-      <span class="option-title">✓  Run Tests</span>
-      <span class="option-desc">Unit tests for engine, data, and battle scene logic</span>
-    </a>
-  </nav>
+  <script src="vendor/phaser.min.js"></script>
+  <script type="module">
+    import MainMenuScene    from './js/scenes/MainMenuScene.js';
+    import BattleModeScene  from './js/scenes/BattleModeScene.js';
+    import BattleScene      from './js/scenes/BattleScene.js';
+    import DialogueScene    from './js/scenes/DialogueScene.js';
+    import AudioScene       from './js/scenes/AudioScene.js';
+    import MoveKioskScene   from './js/scenes/MoveKioskScene.js';
+    import ItemKioskScene   from './js/scenes/ItemKioskScene.js';
+
+    new Phaser.Game({
+      type:            Phaser.AUTO,
+      width:           400,
+      height:          480,
+      backgroundColor: '#0f0f1a',
+      pixelArt:        true,
+      scene: [
+        // MainMenuScene auto-starts first; Battle Mode runs in the same instance
+        // so AudioScene — and intro_credits — remain uninterrupted during navigation.
+        MainMenuScene,
+        BattleModeScene,
+        BattleScene,
+        DialogueScene,
+        AudioScene,
+        MoveKioskScene,
+        ItemKioskScene,
+      ],
+      physics: {
+        default: 'arcade',
+        arcade:  { gravity: { y: 0 }, debug: false },
+      },
+    });
+  </script>
 </body>
 </html>

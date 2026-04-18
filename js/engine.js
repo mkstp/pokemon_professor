@@ -54,6 +54,9 @@ export function init() {
     // Inventory
     inventory:      [],  // [{ itemId, qty }]
     expBoost:       0,   // flat XP bonus consumed by the next awardXP() call
+    // Item loadout (cs7)
+    activeItems:    [],  // ordered item IDs in the pre-battle loadout (max 4 consumables)
+    spentItems:     [],  // IDs of non-reloadable consumables used this session
   };
 }
 
@@ -221,6 +224,56 @@ export function useItem(itemId) {
   applyItemEffect(item);
   removeItem(itemId);
   return item;
+}
+
+// ─── Item loadout ─────────────────────────────────────────────────────────────
+
+const ACTIVE_ITEM_CAP = 4;
+
+// Returns all consumable item definitions from the catalogue (not filtered by inventory).
+// The item kiosk reads this so the full catalogue is always visible.
+export function getAllConsumables() {
+  return items.filter(i => i.category === 'consumable');
+}
+
+// Adds itemId to the active loadout. No-ops if already present, not a consumable,
+// or the 4-slot cap has been reached.
+export function equipItem(itemId) {
+  if (gameState.activeItems.includes(itemId)) return;
+  if (gameState.activeItems.length >= ACTIVE_ITEM_CAP) return;
+  const item = items.find(i => i.id === itemId);
+  if (!item || item.category !== 'consumable') return;
+  gameState.activeItems.push(itemId);
+}
+
+// Removes itemId from the active loadout. No-ops if not present.
+export function unequipItem(itemId) {
+  gameState.activeItems = gameState.activeItems.filter(id => id !== itemId);
+}
+
+// Applies the item's effect, removes it from the active loadout, and records it
+// as spent if repeatableSource is false. Returns the item definition, or null
+// if the item is not in the active loadout.
+export function useActiveItem(itemId) {
+  if (!gameState.activeItems.includes(itemId)) return null;
+  const item = items.find(i => i.id === itemId);
+  if (!item) return null;
+  applyItemEffect(item);
+  gameState.activeItems = gameState.activeItems.filter(id => id !== itemId);
+  if (!item.repeatableSource) {
+    gameState.spentItems.push(itemId);
+  }
+  return item;
+}
+
+// Returns the current active item loadout as an array of item IDs.
+export function getActiveItems() {
+  return [...gameState.activeItems];
+}
+
+// Returns true if itemId has been permanently consumed this session.
+export function isItemSpent(itemId) {
+  return gameState.spentItems.includes(itemId);
 }
 
 // Adds n to damageBuff. Exported so item-granting systems can apply attack boosts
