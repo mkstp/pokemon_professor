@@ -4,9 +4,9 @@ You MUST ensure the photo is a full-length shot, from head to toe, with no parts
 
 96×96 px
 
-Emeryn — The Data Baker (Support Encounter)
-Role / Field: Computational Linguistics (Data Curation & Preprocessing)
-Personality: Soft-spoken, careful, and quietly meticulous. Approaches language the way a careful baker approaches a recipe—measuring, adjusting, and refining until things “come out right.” Tends to frame contributions modestly, often downplaying the amount of work that went into them. Finds comfort in preparation work: cleaning datasets, organizing inputs, making things usable for others. Slightly anxious about reception, but consistently thoughtful in execution.
-Visual design notes: Androgynous figure, early 20s. Slight build, posture gently inward but steady—hands often occupied with something small and precise. Wears soft, comfortable clothing layered with a lightly flour-dusted apron—subtly reinterpreted as a “data prep” apron with stitched pockets holding pens, USB drives, or small notebooks. Hair simple and a bit unstructured. Expression: tentative but focused—eyes scanning, small uncertain smile. Holds a tray or container—cookies shaped like tokens, labeled datasets, or small symbolic “batches.” Color palette is warm and soft (cream, light browns, pastel accents) contrasted with subtle technical notes (grid lines, tiny text labels).
+Casey — The Formalist (Grad Student Battle)
+Role / Field: Computational Linguistics (Formal Methods & Mathematical Foundations)
+Personality: Precise, officious, and quietly exacting. Treats problems as systems to be formalized, not approximated. Speaks in structured, almost proof-like statements; quick to impose definitions and constraints before proceeding. Finds comfort in rigor and consistency, and shows little patience for ambiguity. Not overtly hostile, but carries an implicit expectation that everything should meet a clear standard of correctness.
+Visual design notes: Androgynous figure, mid-20s. Slim build, upright and composed posture—shoulders squared, stance balanced. Dark hair, neatly styled. Wears preppy, structured clothing: crisp button-down, fitted blazer or cardigan, tailored pants. Outfit is clean and symmetrical, emphasizing order. May carry a notebook filled with equations or a tablet displaying formal notation. Expression: focused and slightly severe—brows neutral but intent, lips set in a thin line as if mid-evaluation. Color palette is restrained and academic—navy, charcoal, white—with subtle high-contrast accents (black ink, sharp lines).
 
 please generate this image

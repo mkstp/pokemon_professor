@@ -10,7 +10,7 @@ Demonstrate a disciplined, AI-assisted development methodology. The project serv
 
 ## Project Purpose
 
-pokemon_professor is a standalone browser game built with HTML/CSS/JavaScript. The player controls a student character who roams a tile-based campus — including outdoor areas, building interiors, and hidden regions — and triggers turn-based battles with a fixed sequence of six professors. Each professor has scripted dialogue and a research-themed persona. Winning a battle passes the corresponding class; losing causes the player to faint and restart. The game features scene-appropriate background music and weather animations in the overworld.
+pokemon_professor is a standalone browser game built with HTML/CSS/JavaScript. The player controls a student character who roams a tile-based campus — including outdoor areas, building interiors, and hidden regions — and triggers turn-based battles with a fixed sequence of seven professors. Each professor has scripted dialogue and a research-themed persona. Winning a battle passes the corresponding class; losing causes the player to faint and restart. The game features scene-appropriate background music and weather animations in the overworld.
 
 ## Scope Commitments
 

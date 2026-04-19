@@ -86,15 +86,17 @@ const playerEffects = {
     bs.disrupted = false;
     text('Disruption effect cleared!');
   },
-  mutual_damage_20({ text, animPl }) {
-    const from  = engine.getState().playerHP;
-    const newHP = from - 20;
-    engine.setPlayerHP(newHP);
-    text('You take 20 damage from the mutual exchange.');
-    animPl(from, Math.max(0, newHP));
-    if (newHP <= 0) {
-      text('You fainted!');
-      return 'loss';
+  chance_mutual_damage_30({ text, animPl }) {
+    if (Math.random() < 0.5) {
+      const from  = engine.getState().playerHP;
+      const newHP = from - 30;
+      engine.setPlayerHP(newHP);
+      text('You take 20 damage from the mutual exchange.');
+      animPl(from, Math.max(0, newHP));
+      if (newHP <= 0) {
+        text('You fainted!');
+        return 'loss';
+      }
     }
   },
   reveal_next({ bs, text, opponentType }) {
@@ -248,10 +250,10 @@ const opponentEffects = {
   chance_bonus_10() {
     // Roll handled pre-damage in applyOpponentTurn; no post-damage state.
   },
-  mutual_damage_20({ bs, text, animP, opponentType, opponentId }) {
+  chance_mutual_damage_30({ bs, text, animP, opponentType, opponentId }) {
     const fromPH2  = bs.professorHP;
-    bs.professorHP = Math.max(0, bs.professorHP - 20);
-    text(`${bs.professor.name} also takes 20 damage!`);
+    bs.professorHP = Math.max(0, bs.professorHP - 30);
+    text(`${bs.professor.name} also takes 30 damage!`);
     animP(fromPH2, bs.professorHP);
     if (bs.professorHP <= 0) {
       if (opponentType === 'professor') engine.defeatProfessor(opponentId);
@@ -445,8 +447,8 @@ export function applyOpponentTurn(ctx) {
   if (bs.npcBoostNext10)  { profDamage += 10; bs.npcBoostNext10  = false; }
   if (bs.npcBoostedTurns > 0) { profDamage += 20; bs.npcBoostedTurns--; }
 
-  // mutual_damage_20: player always takes exactly 20; NPC side handled in the effect handler.
-  if (oppMove.effect === 'mutual_damage_20') profDamage = 20;
+  // chance_mutual_damage_30: chance for player to also take exactly 30; NPC side handled in the effect handler.
+  if (oppMove.effect === 'chance_mutual_damage_30') profDamage = 30;
 
   if (oppMove.effect === 'chance_fail'     && Math.random() < 0.2) profDamage = 0;
   if (oppMove.effect === 'chance_bonus_10' && Math.random() < 0.3) profDamage += 10;
