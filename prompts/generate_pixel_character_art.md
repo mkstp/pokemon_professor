@@ -4,9 +4,9 @@ You MUST ensure the photo is a full-length shot, from head to toe, with no parts
 
 96×96 px
 
-Suzanna — The Steady Listener (Badge Encounter)
-Role / Field: Computational Linguistics (Sociolinguistics & Dialect Variation)
-Personality: Reflective, patient, and quietly resilient. Carries a subdued, melancholic tone, but not defeatist—progress is measured in small, meaningful increments. Speaks with care, often framing outcomes in terms of growth rather than success or failure. Attentive to nuance and difference, especially in how people express themselves. Optimism is present, but restrained and hard-earned.
-Visual design notes: Woman, mid-20s, Indian heritage with dark skin. Average height, composed posture with a slight inward softness—shoulders relaxed rather than tense. Wears comfortable, modest clothing with subtle cultural influence—long-sleeve top or kurta-inspired silhouette paired with simple pants or skirt. Hair dark, worn loose or in a low braid. Expression: gentle, thoughtful—eyes slightly downcast but warm, with a faint, restrained smile. May carry a notebook or audio recorder. Color palette leans warm and earthy—deep browns, muted reds, soft golds—balanced with calm neutrals.
+Emeryn — The Data Baker (Support Encounter)
+Role / Field: Computational Linguistics (Data Curation & Preprocessing)
+Personality: Soft-spoken, careful, and quietly meticulous. Approaches language the way a careful baker approaches a recipe—measuring, adjusting, and refining until things “come out right.” Tends to frame contributions modestly, often downplaying the amount of work that went into them. Finds comfort in preparation work: cleaning datasets, organizing inputs, making things usable for others. Slightly anxious about reception, but consistently thoughtful in execution.
+Visual design notes: Androgynous figure, early 20s. Slight build, posture gently inward but steady—hands often occupied with something small and precise. Wears soft, comfortable clothing layered with a lightly flour-dusted apron—subtly reinterpreted as a “data prep” apron with stitched pockets holding pens, USB drives, or small notebooks. Hair simple and a bit unstructured. Expression: tentative but focused—eyes scanning, small uncertain smile. Holds a tray or container—cookies shaped like tokens, labeled datasets, or small symbolic “batches.” Color palette is warm and soft (cream, light browns, pastel accents) contrasted with subtle technical notes (grid lines, tiny text labels).
 
 please generate this image

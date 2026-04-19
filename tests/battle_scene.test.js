@@ -73,8 +73,16 @@ function makeBattleState({ professorMoves = ['minimal_pair'], professorHP = 100 
     npcBoostedTurns:     0,
     npcVulnTurns:        0,
     npcIncomingHalved:   false,
-    playerReducedNext10: 0,
-    lastPlayerDamage:    0,
+    playerReducedNext10:         0,
+    lastPlayerDamage:            0,
+    npcRevealedMove:             null,
+    npcPriority:                 false,
+    lastNpcEffect:               null,
+    pendingSwappedEffect:        null,
+    playerLockedMove:            null,
+    playerPriority:              false,
+    lastPlayerEffect:            null,
+    pendingPlayerSwappedEffect:  null,
   };
 }
 
@@ -1098,4 +1106,138 @@ test('_itemEffectMessage returns "EXP gain boosted!" for boost_exp', () => {
   const scene = makeScene();
   const item = { effect: { action: 'boost_exp', value: 15 } };
   assert.equal(scene._itemEffectMessage(item), 'EXP gain boosted!');
+});
+
+// ─── reveal_next / priority / swap_effect (bidirectional) ────────────────────
+
+test('applyPlayerMove: reveal_next pre-rolls npcRevealedMove and shows text', () => {
+  engine.init();
+  const bs = makeBattleState({ professorMoves: ['minimal_pair'] });
+  bs.playerMoves = [{ id: 'dataset_leak', name: 'Dataset Leak', damage: 16, effect: 'reveal_next' }];
+  bs.selectedMoveIndex = 0;
+  const ctx = makeCtx(bs, 'professor');
+
+  applyPlayerMove(ctx);
+
+  assert.equal(bs.npcRevealedMove, 'minimal_pair', 'should store the pre-rolled NPC move id');
+  assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes('Data leaked')), 'should show data leaked text');
+});
+
+test('applyPlayerMove: priority sets playerPriority flag', () => {
+  engine.init();
+  const bs = makeBattleState();
+  bs.playerMoves = [{ id: 'slack_message', name: 'Slack Message', damage: 10, effect: 'priority' }];
+  bs.selectedMoveIndex = 0;
+  const ctx = makeCtx(bs);
+
+  applyPlayerMove(ctx);
+
+  assert.equal(bs.playerPriority, true, 'should set playerPriority');
+});
+
+test('applyPlayerMove: swap_effect stores lastPlayerEffect as pendingPlayerSwappedEffect', () => {
+  engine.init();
+  const bs = makeBattleState();
+  bs.lastPlayerEffect = 'skip';
+  bs.playerMoves = [{ id: 'methodology_pivot', name: 'Methodology Pivot', damage: 14, effect: 'swap_effect' }];
+  bs.selectedMoveIndex = 0;
+  const ctx = makeCtx(bs);
+
+  applyPlayerMove(ctx);
+
+  assert.equal(bs.pendingPlayerSwappedEffect, 'skip', 'should store previous lastPlayerEffect');
+});
+
+test('applyPlayerMove: playerLockedMove forces specific move regardless of selectedMoveIndex', () => {
+  engine.init();
+  const bs = makeBattleState();
+  bs.playerMoves = [
+    { id: 'peer_review',  name: 'Peer Review',  damage: 20, effect: null },
+    { id: 'office_hours', name: 'Office Hours', damage: 15, effect: null },
+  ];
+  bs.selectedMoveIndex = 0; // would normally use peer_review
+  bs.playerLockedMove  = 'office_hours';
+  const ctx = makeCtx(bs);
+
+  applyPlayerMove(ctx);
+
+  assert.equal(bs.playerLockedMove, null, 'playerLockedMove should be cleared');
+  assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes('Office Hours')), 'should use the locked move');
+  assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes("locked in")), 'should show locked-in message');
+});
+
+test('applyPlayerMove: pendingPlayerSwappedEffect fires after normal effect then clears', () => {
+  engine.init();
+  const bs = makeBattleState();
+  bs.pendingPlayerSwappedEffect = 'skip'; // skip = set professorSkipped
+  bs.playerMoves = [{ id: 'peer_review', name: 'Peer Review', damage: 20, effect: null }];
+  bs.selectedMoveIndex = 0;
+  const ctx = makeCtx(bs);
+
+  applyPlayerMove(ctx);
+
+  assert.equal(bs.professorSkipped, true, 'pendingPlayerSwappedEffect (skip) should have fired');
+  assert.equal(bs.pendingPlayerSwappedEffect, null, 'pendingPlayerSwappedEffect should be cleared');
+});
+
+test('applyOpponentTurn: reveal_next stores playerLockedMove from selected player move', () => {
+  engine.init();
+  const bs = makeBattleState({ professorMoves: ['dataset_leak'] });
+  bs.playerMoves = [{ id: 'peer_review', name: 'Peer Review', damage: 20, effect: null }];
+  bs.selectedMoveIndex = 0;
+  const ctx = makeCtx(bs, 'student');
+
+  applyOpponentTurn(ctx);
+
+  assert.equal(bs.playerLockedMove, 'peer_review', 'should lock the player into their selected move');
+  assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes('locked into')), 'should show lock message');
+});
+
+test('applyOpponentTurn: priority sets npcPriority flag', () => {
+  engine.init();
+  const bs = makeBattleState({ professorMoves: ['slack_message'] });
+  bs.playerMoves = [];
+  const ctx = makeCtx(bs, 'student');
+
+  applyOpponentTurn(ctx);
+
+  assert.equal(bs.npcPriority, true, 'should set npcPriority');
+});
+
+test('applyOpponentTurn: swap_effect stores lastNpcEffect as pendingSwappedEffect', () => {
+  engine.init();
+  const bs = makeBattleState({ professorMoves: ['methodology_pivot'] });
+  bs.lastNpcEffect = 'disrupt';
+  bs.playerMoves = [];
+  const ctx = makeCtx(bs, 'student');
+
+  applyOpponentTurn(ctx);
+
+  assert.equal(bs.pendingSwappedEffect, 'disrupt', 'should store previous lastNpcEffect');
+});
+
+test('applyOpponentTurn: npcRevealedMove used instead of random, then cleared', () => {
+  engine.init();
+  const bs = makeBattleState({ professorMoves: ['dataset_leak', 'conference_talk', 'whiteboard_spiral'] });
+  bs.npcRevealedMove = 'conference_talk';
+  bs.playerMoves = [];
+  const ctx = makeCtx(bs, 'student');
+
+  applyOpponentTurn(ctx);
+
+  assert.equal(bs.npcRevealedMove, null, 'npcRevealedMove should be cleared after use');
+  assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes('Conference Talk')), 'should use the revealed move');
+});
+
+test('applyOpponentTurn: pendingSwappedEffect fires after normal effect then clears', () => {
+  engine.init();
+  const bs = makeBattleState({ professorMoves: ['citation_needed'] }); // citation_needed: damage 0, nullify_last_buff
+  bs.pendingSwappedEffect = 'disrupt'; // disrupt sets bs.disrupted = true
+  bs.playerMoves = [];
+  const ctx = makeCtx(bs, 'student');
+
+  applyOpponentTurn(ctx);
+
+  assert.equal(bs.disrupted, true, 'pendingSwappedEffect (disrupt) should have fired');
+  assert.equal(bs.pendingSwappedEffect, null, 'pendingSwappedEffect should be cleared');
 });

@@ -97,6 +97,25 @@ const playerEffects = {
       return 'loss';
     }
   },
+  reveal_next({ bs, text, opponentType }) {
+    const moveMap = opponentType === 'student' ? NPC_MOVE_MAP : PROF_MOVE_MAP;
+    const moveIds = bs.professor.moves;
+    const nextId  = moveIds[Math.floor(Math.random() * moveIds.length)];
+    bs.npcRevealedMove = nextId;
+    text(`Data leaked! ${bs.professor.name} will use ${moveMap[nextId].name} next turn.`);
+  },
+  priority({ bs, text }) {
+    bs.playerPriority = true;
+    text("You queue a priority message — you'll act first next turn!");
+  },
+  swap_effect({ bs, text }) {
+    bs.pendingPlayerSwappedEffect = bs.lastPlayerEffect;
+    if (bs.lastPlayerEffect) {
+      text('You pivot your methodology — your previous technique will echo next turn!');
+    } else {
+      text('You pivot, but have no prior technique to echo.');
+    }
+  },
   // These effects modify damage before it's applied; no post-damage action needed.
   counter:            null,
   conditional_damage: null,
@@ -257,17 +276,22 @@ const opponentEffects = {
     }
     if (extraHits > 0) text(`Hit ${extraHits + 1} times!`);
   },
-  // ── Stubbed effects (full implementation tracked in separate issues) ──────
-  swap_effect({ bs, text }) {
-    // stub — test_project-umf: Fully implement swap_effect
-    text(`${bs.professor.name} attempts to redirect — nothing happens.`);
-  },
-  priority() {
-    // stub — test_project-u5n: Fully implement priority
-  },
   reveal_next({ bs, text }) {
-    // stub — test_project-aqz: Fully implement reveal_next
-    text(`${bs.professor.name} studies your moves carefully.`);
+    const usedMove = bs.playerMoves[bs.selectedMoveIndex];
+    bs.playerLockedMove = usedMove.id;
+    text(`${bs.professor.name} reads your approach — you'll be locked into ${usedMove.name} next turn!`);
+  },
+  priority({ bs, text }) {
+    bs.npcPriority = true;
+    text(`${bs.professor.name} queues a priority message — they'll act first next turn!`);
+  },
+  swap_effect({ bs, text }) {
+    bs.pendingSwappedEffect = bs.lastNpcEffect;
+    if (bs.lastNpcEffect) {
+      text(`${bs.professor.name} pivots their methodology — their previous technique will echo next turn!`);
+    } else {
+      text(`${bs.professor.name} pivots, but has nothing to echo.`);
+    }
   },
 };
 
@@ -305,7 +329,12 @@ export function applyPlayerMove(ctx) {
     return null;
   }
 
-  const move = bs.playerMoves[bs.selectedMoveIndex];
+  const lockedId = bs.playerLockedMove;
+  if (lockedId) bs.playerLockedMove = null;
+  const move = lockedId
+    ? (bs.playerMoves.find(m => m.id === lockedId) ?? bs.playerMoves[bs.selectedMoveIndex])
+    : bs.playerMoves[bs.selectedMoveIndex];
+  if (lockedId) text(`You're locked in — forced to use ${move.name}!`);
 
   // 'counter' / 'conditional_damage': deal 40 if the opponent's last move dealt ≥ 30.
   let playerDamage = (move.effect === 'counter' || move.effect === 'conditional_damage') && bs.lastProfessorDamage >= 30
@@ -350,6 +379,16 @@ export function applyPlayerMove(ctx) {
     if (result) return result;
   }
 
+  if (bs.pendingPlayerSwappedEffect && bs.pendingPlayerSwappedEffect !== 'swap_effect') {
+    const swapHandler = playerEffects[bs.pendingPlayerSwappedEffect];
+    if (swapHandler) {
+      const swapResult = swapHandler({ ...ctx, move });
+      if (swapResult) { bs.pendingPlayerSwappedEffect = null; return swapResult; }
+    }
+    bs.pendingPlayerSwappedEffect = null;
+  }
+  bs.lastPlayerEffect = move.effect;
+
   if (bs.professorHP <= 0) {
     if (opponentType === 'professor') engine.defeatProfessor(opponentId);
     text(`${bs.professor.name} is defeated!`);
@@ -380,13 +419,16 @@ export function applyOpponentTurn(ctx) {
 
   const moveMap   = opponentType === 'student' ? NPC_MOVE_MAP : PROF_MOVE_MAP;
   const moveIds   = bs.professor.moves;
-  const oppMoveId = moveIds[Math.floor(Math.random() * moveIds.length)];
+  const oppMoveId = bs.npcRevealedMove ?? moveIds[Math.floor(Math.random() * moveIds.length)];
+  bs.npcRevealedMove = null;
   const oppMove   = moveMap[oppMoveId];
 
   if (oppMove.effect === 'deferred') {
     bs.deferredDamage      = oppMove.damage;
     bs.lastProfessorDamage = 0;
     text(`${bs.professor.name} uses ${oppMove.name}. The effect is delayed...`);
+    bs.lastNpcEffect       = oppMove.effect;
+    bs.pendingSwappedEffect = null;
     return null;
   }
 
@@ -429,6 +471,16 @@ export function applyOpponentTurn(ctx) {
     const result = handler({ ...ctx, move: oppMove });
     if (result) return result;
   }
+
+  if (bs.pendingSwappedEffect && bs.pendingSwappedEffect !== 'swap_effect') {
+    const swapHandler = opponentEffects[bs.pendingSwappedEffect];
+    if (swapHandler) {
+      const swapResult = swapHandler({ ...ctx, move: oppMove });
+      if (swapResult) { bs.pendingSwappedEffect = null; return swapResult; }
+    }
+    bs.pendingSwappedEffect = null;
+  }
+  bs.lastNpcEffect = oppMove.effect;
 
   if (toPHP <= 0) {
     text('You fainted!');

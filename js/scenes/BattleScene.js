@@ -11,6 +11,7 @@
 //             data/students.js, data/moves.js
 
 import * as engine from '../engine.js';
+import { STARTING_HP } from '../engine.js';
 import { professors }                            from '../data/professors.js';
 import { studentNPCs }                           from '../data/students.js';
 import { playerMoves, professorMoves, npcMoves } from '../data/moves.js';
@@ -158,32 +159,50 @@ export default class BattleScene extends Phaser.Scene {
     //   npcIncomingHalved   — NPC's next incoming damage halved (heal_and_shield)
     //   playerReducedNext10 — flat reduction on player's next move damage (reduce_next_10, heal_and_reduce_next)
     //   lastPlayerDamage    — player's last damage dealt (for NPC 'conditional_damage' check)
+    //
+    // Bidirectional move effects (reveal_next / priority / swap_effect):
+    //   npcRevealedMove            — pre-rolled NPC move id; used next applyOpponentTurn instead of random
+    //   npcPriority                — NPC acts first next turn (set by NPC 'priority'; cleared by playerPriority)
+    //   lastNpcEffect              — effect of last NPC move (for NPC swap_effect)
+    //   pendingSwappedEffect       — NPC effect to echo next turn (set by NPC swap_effect)
+    //   playerLockedMove           — move id player is forced to re-use next turn (set by NPC reveal_next)
+    //   playerPriority             — player acts first even if npcPriority is set
+    //   lastPlayerEffect           — effect of last player move (for player swap_effect)
+    //   pendingPlayerSwappedEffect — player effect to echo next turn (set by player swap_effect)
     this.battleState = {
-      professor:            prof,
-      professorHP:          prof.hp,
-      playerMoves:          activeMoves,
-      selectedMoveIndex:    0,
-      menuLevel:            'action', // 'action' | 'moves' | 'items'
-      selectedActionIndex:  0,
-      selectedItemIndex:    0,
-      itemScrollOffset:     0,
-      phase:                'select', // 'select' | 'resolve' | 'animating' | 'end' | 'done'
-      outcome:              null,     // null | 'win' | 'loss' | 'fled'
-      disrupted:            false,
-      professorSkipped:     false,
-      professorHalved:      false,
-      deferredDamage:       0,
-      lastProfessorDamage:  0,
-      playerSkipped:        false,
-      npcSkippedTurns:      0,
-      npcHalvedNext:        false,
-      npcDoubledNext:       false,
-      npcBoostNext10:       false,
-      npcBoostedTurns:      0,
-      npcVulnTurns:         0,
-      npcIncomingHalved:    false,
-      playerReducedNext10:  0,
-      lastPlayerDamage:     0,
+      professor:                   prof,
+      professorHP:                 prof.hp,
+      playerMoves:                 activeMoves,
+      selectedMoveIndex:           0,
+      menuLevel:                   'action', // 'action' | 'moves' | 'items'
+      selectedActionIndex:         0,
+      selectedItemIndex:           0,
+      itemScrollOffset:            0,
+      phase:                       'select', // 'select' | 'resolve' | 'animating' | 'end' | 'done'
+      outcome:                     null,     // null | 'win' | 'loss' | 'fled'
+      disrupted:                   false,
+      professorSkipped:            false,
+      professorHalved:             false,
+      deferredDamage:              0,
+      lastProfessorDamage:         0,
+      playerSkipped:               false,
+      npcSkippedTurns:             0,
+      npcHalvedNext:               false,
+      npcDoubledNext:              false,
+      npcBoostNext10:              false,
+      npcBoostedTurns:             0,
+      npcVulnTurns:                0,
+      npcIncomingHalved:           false,
+      playerReducedNext10:         0,
+      lastPlayerDamage:            0,
+      npcRevealedMove:             null,
+      npcPriority:                 false,
+      lastNpcEffect:               null,
+      pendingSwappedEffect:        null,
+      playerLockedMove:            null,
+      playerPriority:              false,
+      lastPlayerEffect:            null,
+      pendingPlayerSwappedEffect:  null,
     };
 
     // --- Background ---
@@ -448,18 +467,27 @@ export default class BattleScene extends Phaser.Scene {
 
     const ctx = { bs, seq, text, animP, animPl, opponentType: this.opponentType, opponentId: this.opponentId };
 
-    // 1. Apply any deferred professor damage from the previous turn.
+    // Deferred damage always applies first, regardless of priority.
     if (applyDeferredDamage(ctx)) return this._endSeq(seq, 'loss');
 
-    // 2-5. Apply player move and check for win/loss.
-    const playerResult = applyPlayerMove(ctx);
-    if (playerResult) return this._endSeq(seq, playerResult);
+    // Priority: NPC goes first only if npcPriority is set and playerPriority is not.
+    const npcGoesFirst = bs.npcPriority && !bs.playerPriority;
+    bs.npcPriority    = false;
+    bs.playerPriority = false;
 
-    // 6. Apply opponent's turn and check for win/loss.
-    const profResult = applyOpponentTurn(ctx);
-    if (profResult) return this._endSeq(seq, profResult);
+    if (npcGoesFirst) {
+      const profResult = applyOpponentTurn(ctx);
+      if (profResult) return this._endSeq(seq, profResult);
+      const playerResult = applyPlayerMove(ctx);
+      if (playerResult) return this._endSeq(seq, playerResult);
+    } else {
+      const playerResult = applyPlayerMove(ctx);
+      if (playerResult) return this._endSeq(seq, playerResult);
+      const profResult = applyOpponentTurn(ctx);
+      if (profResult) return this._endSeq(seq, profResult);
+    }
 
-    // 7. Turn complete — run the visual sequence, then return to the action menu.
+    // Turn complete — run the visual sequence, then return to the action menu.
     this._runSequence(seq, () => {
       bs.phase = 'select';
       bs.menuLevel = 'action';
@@ -529,13 +557,13 @@ export default class BattleScene extends Phaser.Scene {
 
   // Redraws the player HP bar and numeric counter at the given hp value.
   _drawPlayerHPBar(hp) {
-    const ratio = Math.max(0, hp / 100);
+    const ratio = Math.max(0, hp / STARTING_HP);
     this.playerHPBar.clear();
     this.playerHPBar.fillStyle(0xcccccc);
     this.playerHPBar.fillRect(PLAYER_HP_BAR_X, PLAYER_HP_BAR_Y, HP_BAR_W, HP_BAR_H);
     this.playerHPBar.fillStyle(this._hpColour(ratio));
     this.playerHPBar.fillRect(PLAYER_HP_BAR_X, PLAYER_HP_BAR_Y, Math.floor(HP_BAR_W * ratio), HP_BAR_H);
-    this.playerHPText.setText(`${Math.max(0, Math.round(hp))}/100`);
+    this.playerHPText.setText(`${Math.max(0, Math.round(hp))}/${STARTING_HP}`);
   }
 
   // Redraws the player XP bar beneath the HP bar at the given xp / xpToNextLevel values.
@@ -660,7 +688,7 @@ export default class BattleScene extends Phaser.Scene {
   _animatePlayerHP(from, to, next) {
     if (from > to) {
       this.cameras.main.shake(300, 0.008);
-      this._playHitSfx(from - to, 100);
+      this._playHitSfx(from - to, STARTING_HP);
     }
     this.tweens.addCounter({
       from, to,

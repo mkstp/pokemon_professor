@@ -3,7 +3,6 @@
 
 // ─── STUDENT NPCs ─────────────────────────────────────────────────────────────
 // Battle-capable student characters encountered in the overworld.
-// hp: 80 placeholder — requires balancing pass before final implementation.
 // sprite: placeholder path — requires art asset pass.
 // Schema: see tdd/data.md § StudentNPC.
 
@@ -11,7 +10,7 @@ export const studentNPCs = [
   {
     id: 'student_halvorsen',
     name: 'Halvorsen',
-    hp: 80,
+    hp: 100,
     moves: ['counterexample', 'correction', 'peer_review', 'cite_this'],
     dialogue: {
       preBattle: 'student_halvorsen_pre',
@@ -24,7 +23,7 @@ export const studentNPCs = [
   {
     id: 'student_rohan',
     name: 'Rohan',
-    hp: 80,
+    hp: 70,
     moves: ['hot_take', 'non_sequitur', 'scope_creep', 'room_booking_rant'],
     dialogue: {
       preBattle: 'student_rohan_pre',
@@ -36,7 +35,7 @@ export const studentNPCs = [
   {
     id: 'student_voss',
     name: 'Voss',
-    hp: 80,
+    hp: 150,
     moves: ['correction', 'counterexample', 'citation_needed', 'deadline_panic'],
     dialogue: {
       preBattle: 'student_voss_pre',
@@ -48,7 +47,7 @@ export const studentNPCs = [
   {
     id: 'student_lab_sentinel_k',
     name: 'Lab Sentinel K',
-    hp: 80,
+    hp: 160,
     moves: ['cite_this', 'peer_review', 'undergrad_flashback', 'access_denied'],
     dialogue: {
       preBattle: 'student_lab_sentinel_k_pre',
@@ -60,7 +59,7 @@ export const studentNPCs = [
   {
     id: 'student_finnegan',
     name: 'Finnegan',
-    hp: 80,
+    hp: 90,
     moves: ['correction', 'non_sequitur', 'hot_take', 'question_mark'],
     dialogue: {
       preBattle: 'student_finnegan_pre',
@@ -72,7 +71,7 @@ export const studentNPCs = [
   {
     id: 'student_simon',
     name: 'Simon',
-    hp: 80,
+    hp: 140,
     moves: ['all_nighter', 'burnout', 'overfit_model', 'whiteboard_spiral'],
     dialogue: {
       preBattle: 'student_simon_pre',
@@ -84,7 +83,7 @@ export const studentNPCs = [
   {
     id: 'student_chadwick',
     name: 'Chadwick',
-    hp: 80,
+    hp: 75,
     moves: ['hot_take', 'conference_talk', 'group_project', 'deadline_panic'],
     dialogue: {
       preBattle: 'student_chadwick_pre',
@@ -96,7 +95,7 @@ export const studentNPCs = [
   {
     id: 'student_mina',
     name: 'Mina',
-    hp: 80,
+    hp: 95,
     moves: ['impostor_syndrome', 'deadline_panic', 'revise_and_resubmit', 'office_hours'],
     dialogue: {
       preBattle: 'student_mina_pre',
@@ -108,7 +107,7 @@ export const studentNPCs = [
   {
     id: 'student_jax',
     name: 'Jax',
-    hp: 80,
+    hp: 180,
     moves: ['non_sequitur', 'hot_take', 'whiteboard_spiral', 'group_project'],
     dialogue: {
       preBattle: 'student_jax_pre',
@@ -120,7 +119,7 @@ export const studentNPCs = [
   {
     id: 'student_marcellus',
     name: 'Marcellus',
-    hp: 80,
+    hp: 120,
     moves: ['non_sequitur', 'counterexample', 'scope_creep', 'meaning_crisis'],
     dialogue: {
       preBattle: 'student_marcellus_pre',
@@ -134,19 +133,20 @@ export const studentNPCs = [
   {
     id: 'student_elena',
     name: 'Elena',
-    hp: 80,
+    hp: 190,
     moves: ['conference_talk', 'advisor_email', 'tenure_track_dream', 'colloquium_circuit'],
     dialogue: {
       preBattle: 'student_elena_pre',
       postWin:   'student_elena_win',
       postLoss:  'student_elena_loss',
     },
+    reward: 'token_of_appreciation_badge',
     sprite: 'assets/sprites/battle/student_elena.png',
   },
   {
     id: 'student_soren',
     name: 'Soren',
-    hp: 80,
+    hp: 85,
     moves: ['hot_take', 'non_sequitur', 'scope_creep', 'undergrad_flashback'],
     dialogue: {
       preBattle: 'student_soren_pre',
@@ -158,7 +158,7 @@ export const studentNPCs = [
   {
     id: 'student_valentine',
     name: 'Valentine',
-    hp: 80,
+    hp: 65,
     moves: ['whiteboard_spiral', 'non_sequitur', 'hot_take', 'dataset_leak'],
     dialogue: {
       preBattle: 'student_valentine_pre',
@@ -170,7 +170,7 @@ export const studentNPCs = [
   {
     id: 'student_lionel',
     name: 'Lionel',
-    hp: 80,
+    hp: 350,
     moves: ['group_project', 'revise_and_resubmit', 'hot_take', 'deep_cut'],
     dialogue: {
       preBattle: 'student_lionel_pre',
@@ -184,7 +184,7 @@ export const studentNPCs = [
   {
     id: 'student_suzanna',
     name: 'Suzanna',
-    hp: 80,
+    hp: 200,
     moves: ['revise_and_resubmit', 'office_hours', 'all_nighter', 'silver_lining'],
     dialogue: {
       preBattle: 'student_suzanna_pre',
@@ -194,5 +194,83 @@ export const studentNPCs = [
     },
     reward:  'dialecters_badge',
     sprite: 'assets/sprites/battle/student_suzanna.png',
+  },
+  {
+    id: 'student_noem',
+    name: 'Noem',
+    hp: 240,
+    moves: ['group_project', 'revise_and_resubmit', 'burnout', 'whiteboard_spiral'],
+    dialogue: {
+      preBattle: 'student_noem_pre',
+      postWin:   'student_noem_win',
+      postLoss:  'student_noem_loss',
+      reward:    'student_noem_reward',
+    },
+    reward:  'purim_cookie',
+    sprite: 'assets/sprites/battle/student_noem.png',
+  },
+  {
+    id: 'student_pixi',
+    name: 'Pixi',
+    hp: 280,
+    moves: ['correction', 'revise_and_resubmit', 'conference_talk', 'non_sequitor'],
+    dialogue: {
+      preBattle: 'student_pixi_pre',
+      postWin:   'student_pixi_win',
+      postLoss:  'student_pixi_loss',
+      reward:    'student_pixi_reward',
+    },
+    reward:  'viatmin_water',
+    sprite: 'assets/sprites/battle/student_pixi.png',
+  },
+  {
+    id: 'student_clara',
+    name: 'Clara',
+    hp: 260,
+    moves: ['group_project', 'revise_and_resubmit', 'hot_take', 'non_sequitur'],
+    dialogue: {
+      preBattle: 'student_clara_pre',
+      postWin:   'student_clara_win',
+      postLoss:  'student_clara_loss',
+      reward:    'student_clara_reward',
+    },
+    reward:  'triscuit',
+    sprite: 'assets/sprites/battle/student_clara.png',
+  },
+  {
+    id: 'student_antaeus',
+    name: 'Antaeus',
+    hp: 110,
+    moves: ['deadline_panic', 'non_sequitur', 'scope_creep', 'tenure_track_dream'],
+    dialogue: {
+      preBattle: 'student_antaeus_pre',
+      postWin:   'student_antaeus_win',
+      postLoss:  'student_antaeus_loss',
+    },
+    sprite: 'assets/sprites/battle/student_antaeus.png',
+  },
+  {
+    id: 'student_casey',
+    name: 'Casey',
+    hp: 370,
+    moves: ['deadline_panic', 'non_sequitur', 'scope_creep', 'tenure_track_dream'],
+    dialogue: {
+      preBattle: 'student_antaeus_pre',
+      postWin:   'student_antaeus_win',
+      postLoss:  'student_antaeus_loss',
+    },
+    sprite: 'assets/sprites/battle/student_antaeus.png',
+  },
+  {
+    id: 'student_kyle',
+    name: 'Kyle',
+    hp: 330,
+    moves: ['burnout', 'office_hours', 'deadline_panic', 'all_nighter'],
+    dialogue: {
+      preBattle: 'student_kyle_pre',
+      postWin:   'student_kyle_win',
+      postLoss:  'student_kyle_loss',
+    },
+    sprite: 'assets/sprites/battle/student_kyle.png',
   },
 ];

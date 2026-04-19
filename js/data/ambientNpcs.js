@@ -15,7 +15,7 @@ export const ambientNPCs = [
     name: 'Casey',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
     dialogue: 'npc_casey',
-    reward: 'meal_lovers_badge',
+    reward: 'meal_lovers_badge', //once you've aquired all food items at least once
     repeatableReward: false,
   },
   {
@@ -23,7 +23,7 @@ export const ambientNPCs = [
     name: 'Antaeus',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
     dialogue: 'npc_antaeus',
-    // reward: TBD — gives grad lounge food but no specific item id assigned yet
+    reward: 'meaningful_spaghetti',
     repeatableReward: true,
   },
   {
@@ -63,7 +63,7 @@ export const ambientNPCs = [
     name: 'Ruby',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
     dialogue: 'npc_ruby',
-    reward: 'community_badge',
+    reward: 'community_badge', //once you've talked to every character in the game (including parsemore)
     repeatableReward: false,
   },
 ];

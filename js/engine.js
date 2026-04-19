@@ -17,7 +17,7 @@ const PRE_CASTLE_PROFESSOR_IDS = professors.slice(0, -2).map(p => p.id);
 
 // Starting values used by both init() and resetGame().
 const STARTING_REGION = 'outdoor_campus';
-const STARTING_HP     = 100;
+export const STARTING_HP = 100;
 const STARTING_LEVEL  = 1;
 const STARTING_XP     = 0;
 const XP_PER_LEVEL    = 100; // XP required to reach each successive level
@@ -159,7 +159,7 @@ function applyItemEffect(item) {
   const { action, value } = item.effect;
   switch (action) {
     case 'restore_hp':
-      setPlayerHP(value === null ? 100 : gameState.playerHP + value);
+      setPlayerHP(value === null ? STARTING_HP : gameState.playerHP + value);
       break;
     case 'boost_attack':
       gameState.damageBuff += value;

@@ -27,6 +27,7 @@ export const professors = [
       postWin:   'prof_schwaartz_win',
       postLoss:  'prof_schwaartz_loss',
     },
+    reward: 'id_card',
     sprite:      'assets/sprites/battle/schwaartz_l1.png',
     sprites:     [
       'assets/sprites/battle/schwaartz_l1.png',   // > 66 % HP
@@ -62,7 +63,7 @@ export const professors = [
     id: 'prof_composita',
     name: 'Prof. Composita',
     field: 'Semantics',
-    hp: 120,
+    hp: 130,
     location: {
       region: 'main_building',
       tile: { x: 7, y: 3 },
@@ -85,7 +86,7 @@ export const professors = [
     id: 'prof_recursio',
     name: 'Prof. Recursio',
     field: 'Data Structures & Algorithms',
-    hp: 140,
+    hp: 170,
     location: {
       region: 'basement',
       tile: { x: 5, y: 6 },
@@ -108,7 +109,7 @@ export const professors = [
     id: 'prof_bayesio',
     name: 'Prof. Bayesio',
     field: 'NLP / Deep Learning',
-    hp: 160,
+    hp: 210,
     location: {
       region: 'lab_wing',
       tile: { x: 7, y: 2 },
@@ -131,7 +132,7 @@ export const professors = [
     id: 'prof_vec_tor',
     name: 'Prof. Vec Tor',
     field: 'Computational Semantics',
-    hp: 180,
+    hp: 300,
     location: {
       region: 'castle',
       tile: { x: 5, y: 2 },
@@ -142,6 +143,7 @@ export const professors = [
       postWin:   'prof_vec_tor_win',
       postLoss:  'prof_vec_tor_loss',
     },
+    reward: 'secret_code',
     sprite:  'assets/sprites/battle/vec_tor_l1.png',
     sprites: [
       'assets/sprites/battle/vec_tor_l1.png',
@@ -154,7 +156,7 @@ export const professors = [
     id: 'prof_parsemore',
     name: 'Prof. Parsemore',
     field: 'Computational Linguistics / Corpus Analysis',
-    hp: 200,
+    hp: 400,
     location: {
       region: 'courtyard',
       tile: { x: 5, y: 2 },

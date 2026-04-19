@@ -36,7 +36,7 @@ const OPP_BTN_W      = 340;
 const BTN_H          =  34;
 const BTN_Y0         = TAB_H + 54; // first button centre within content panel
 const BTN_GAP        =  44;
-const OPPS_PER_PAGE  =   9;
+const OPPS_PER_PAGE  =   8;
 
 export default class BattleModeScene extends Phaser.Scene {
   constructor() {
