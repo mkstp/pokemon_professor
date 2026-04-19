@@ -22,12 +22,13 @@ const ALL_MOVE_MAP = Object.fromEntries(
 );
 
 // Known move IDs from data/moves.js — used as test fixtures.
-// STARTING_MOVE_IDS in engine.js = ['non_sequitur', 'all_nighter', 'counterexample', 'correction']
+// STARTING_MOVE_IDS in engine.js = ['impostor_syndrome', 'hot_take', 'non_sequitur', 'undergrad_flashback']
+// MOVE_A is a starting move; MOVE_B–D are npcMoves (not in STARTING_MOVE_IDS) used as test fixtures.
 const MOVE_A = 'non_sequitur';     // in STARTING_MOVE_IDS
-const MOVE_B = 'all_nighter';      // in STARTING_MOVE_IDS
-const MOVE_C = 'counterexample';   // in STARTING_MOVE_IDS
-const MOVE_D = 'correction';       // in STARTING_MOVE_IDS
-const MOVE_E = 'cite_this';        // NOT in STARTING_MOVE_IDS — useful for overflow tests
+const MOVE_B = 'all_nighter';      // npcMove — useful as a non-starting learned move
+const MOVE_C = 'counterexample';   // npcMove — useful as a non-starting learned move
+const MOVE_D = 'correction';       // npcMove — useful as a non-starting learned move
+const MOVE_E = 'cite_this';        // npcMove — not in STARTING_MOVE_IDS; useful for overflow tests
 
 // ─── Minimal Phaser stubs ──────────────────────────────────────────────────────
 
@@ -154,7 +155,7 @@ test('MoveKioskScene: create() populates learnedMoves from engine state', () => 
 });
 
 test('MoveKioskScene: create() includes extra learned moves beyond starting set', () => {
-  // MOVE_E (cite_this) is not in STARTING_MOVE_IDS — adding it should produce 5 learned moves.
+  // MOVE_E (cite_this) is an npcMove not in STARTING_MOVE_IDS — adding it should produce 5 learned moves.
   const scene = makeSceneViaCreate({ learnedIds: [MOVE_E] });
   assert.equal(scene.learnedMoves.length, 5, 'learnedMoves should have 5 entries after adding MOVE_E');
 });

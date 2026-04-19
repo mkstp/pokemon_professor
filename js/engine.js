@@ -10,10 +10,10 @@ import { regions }    from './data/regions.js';
 import { professors } from './data/professors.js';
 import { items }      from './data/items.js';
 
-// The five professors who must be defeated to unlock the castle.
-// Excludes both the final boss (prof_vec_tor) and the secret boss (prof_parsemore),
-// which are the last two entries in the professors array.
-const PRE_CASTLE_PROFESSOR_IDS = professors.slice(0, -2).map(p => p.id);
+// The six professors who must be defeated to unlock the castle.
+// Excludes only the final boss (prof_vec_tor), the last entry in the professors array.
+// Parsemore is a secret boss but is encountered before the castle and counts toward this.
+const PRE_CASTLE_PROFESSOR_IDS = professors.slice(0, -1).map(p => p.id);
 
 // Starting values used by both init() and resetGame().
 const STARTING_REGION = 'outdoor_campus';

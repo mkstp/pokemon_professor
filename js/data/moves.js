@@ -55,8 +55,9 @@ export const professorMoves = [
     id: 'stress_shift',
     name: 'Stress Shift',
     damage: 16,
-    description: 'Disrupts the student\'s rhythm — their next move is less effective.',
-    effect: 'disrupt',
+    description: 'Disrupts the student\'s rhythm — 50% change their next move is cancelled.',
+    effect: 'chance_skip_opponent',
+    skipChance: 0.5,
   },
   {
     id: 'aspiration',
@@ -223,6 +224,8 @@ export const professorMoves = [
     damage: 50,
     description: 'Rapid shallow parsing — hits fast and covers ground before the student can react.',
     effect: 'chain_hit_3',
+    chainHitChance: 0.5,
+    maxChainHits: 3,
   },
   {
     id: 'dep_parse',
@@ -241,7 +244,7 @@ export const professorMoves = [
   {
     id: 'full_parse',
     name: 'Full Parse',
-    damage: 150,
+    damage: 200,
     description: 'An exhaustive structural analysis. Leaves nowhere to hide — but the effect arrives next turn.',
     effect: 'skip_self_2',
   }
@@ -284,6 +287,7 @@ export const npcMoves = [
     damage: 15,
     description: 'Chaotic but insightful. 25% chance opponent\'s next move deals half damage.',
     effect: 'chance_halve_opponent',
+    halveChance: 0.25,
   },
   {
     id: 'counterexample',
@@ -298,6 +302,7 @@ export const npcMoves = [
     damage: 17,
     description: 'Constructive but limiting. Reduces opponent\'s next damage by 10 (flat).',
     effect: 'reduce_next_10',
+    reduceAmount: 10,
   },
   {
     id: 'cite_this',
@@ -305,6 +310,7 @@ export const npcMoves = [
     damage: 10,
     description: 'Literature as a weapon. 50% chance to skip opponent\'s next move.',
     effect: 'chance_skip_opponent',
+    skipChance: 0.5,
   },
   {
     id: 'group_project',
@@ -312,6 +318,8 @@ export const npcMoves = [
     damage: 18,
     description: 'Sometimes it works. 30% chance to deal +10 bonus damage.',
     effect: 'chance_bonus_10',
+    bonusChance: 0.3,
+    bonusAmount: 10,
   },
   {
     id: 'correction',
@@ -348,6 +356,7 @@ export const npcMoves = [
     damage: 15,
     description: 'Authority intervention. 50% chance to skip opponent\'s next move.',
     effect: 'chance_skip_opponent',
+    skipChance: 0.5,
   },
   {
     id: 'all_nighter',
@@ -355,6 +364,7 @@ export const npcMoves = [
     damage: 38,
     description: 'High output, unsustainable. User takes 10 self-damage.',
     effect: 'self_damage',
+    recoilAmount: 10,
   },
   {
     id: 'overfit_model',
@@ -369,6 +379,7 @@ export const npcMoves = [
     damage: 35,
     description: 'High risk execution. 20% chance to fail (deal 0 damage).',
     effect: 'chance_fail',
+    failureChance: 0.2,
   },
   {
     id: 'dataset_leak',
@@ -405,6 +416,7 @@ export const npcMoves = [
     damage: 25,
     description: 'Performative confidence. 50% chance to boost next move by +10 damage.',
     effect: 'chance_boost_next_10',
+    boostChance: 0.5,
   },
   {
     id: 'tenure_track_dream',
@@ -413,6 +425,7 @@ export const npcMoves = [
     description: 'Motivational buffer. Heals 15 HP; next incoming damage reduced by 10.',
     effect: 'heal_and_reduce_next',
     healAmount: 15,
+    reduceAmount: 10,
   },
   {
     id: 'hallucination',
@@ -420,6 +433,7 @@ export const npcMoves = [
     damage: 40,
     description: 'Confident but untethered. 20% chance to deal 0 damage.',
     effect: 'chance_fail',
+    failureChance: 0.2,
   },
   {
     id: 'dataset_bias',
@@ -441,6 +455,8 @@ export const npcMoves = [
     damage: 25,
     description: 'Explores multiple paths. Hits twice for reduced damage.',
     effect: 'chain_hit_3',
+    chainHitChance: 0.5,
+    maxChainHits: 3,
   },
   {
     id: 'fine_tune',
@@ -449,6 +465,7 @@ export const npcMoves = [
     description: 'Careful adjustment.  Heals 25 HP; next incoming damage reduced by 10.',
     effect: 'heal_and_reduce_next',
     healAmount: 35,
+    reduceAmount: 10,
   },
   
   // ── Special moves (per-character, included in pool for referential integrity) ──
@@ -458,6 +475,7 @@ export const npcMoves = [
     damage: 18,
     description: '50% chance to delay opponent (skip next turn). Everything\'s still broken.',
     effect: 'chance_skip_opponent',
+    skipChance: 0.5,
   },
   {
     id: 'question_mark',
@@ -465,6 +483,8 @@ export const npcMoves = [
     damage: 10,
     description: 'Up to 3 sequential hits; each additional hit has 50% chance to trigger.',
     effect: 'chain_hit_3',
+    chainHitChance: 0.5,
+    maxChainHits: 3,
   },
   {
     id: 'meaning_crisis',
@@ -472,6 +492,8 @@ export const npcMoves = [
     damage: 30,
     description: 'Chance for player to also receive 30 damage',
     effect: 'chance_mutual_damage_30',
+    mutualDamage: 30,
+    mutualChance: 0.5,
   },
   {
     id: 'access_denied',
@@ -508,6 +530,7 @@ export const npcMoves = [
     damage: 40,
     description: 'A track only the dedicated listener knows. 25% chance opponent\'s next move deals half damage.',
     effect: 'chance_halve_opponent',
+    halveChance: 0.25,
   },
   {
     id: 'capstone',

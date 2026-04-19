@@ -36,28 +36,30 @@ const playerEffects = {
     bs.professorSkipped = true;
     text(`${bs.professor.name} is thrown off — skips their next turn.`);
   },
-  chance_skip_opponent({ bs, text }) {
-    if (Math.random() < 0.5) {
+  chance_skip_opponent({ bs, text, move }) {
+    if (Math.random() < (move.skipChance ?? 0.5)) {
       bs.professorSkipped = true;
       text(`${bs.professor.name} is stunned — skips their next turn.`);
     }
   },
-  player_recoil({ text, animPl }) {
-    const from  = engine.getState().playerHP;
-    const newHP = from - 10;
+  player_recoil({ text, animPl, move }) {
+    const recoil = move.recoilAmount ?? 10;
+    const from   = engine.getState().playerHP;
+    const newHP  = from - recoil;
     engine.setPlayerHP(newHP);
-    text('You take 10 recoil damage.');
+    text(`You take ${recoil} recoil damage.`);
     animPl(from, Math.max(0, newHP));
     if (newHP <= 0) {
       text('You fainted from recoil!');
       return 'loss';
     }
   },
-  self_damage({ text, animPl }) {
-    const from  = engine.getState().playerHP;
-    const newHP = from - 10;
+  self_damage({ text, animPl, move }) {
+    const recoil = move.recoilAmount ?? 10;
+    const from   = engine.getState().playerHP;
+    const newHP  = from - recoil;
     engine.setPlayerHP(newHP);
-    text('You take 10 recoil damage.');
+    text(`You take ${recoil} recoil damage.`);
     animPl(from, Math.max(0, newHP));
     if (newHP <= 0) {
       text('You fainted from recoil!');
@@ -76,8 +78,8 @@ const playerEffects = {
     bs.professorHalved = true;
     text(`${bs.professor.name}'s next move will deal half damage.`);
   },
-  chance_halve_opponent({ bs, text }) {
-    if (Math.random() < 0.25) {
+  chance_halve_opponent({ bs, text, move }) {
+    if (Math.random() < (move.halveChance ?? 0.25)) {
       bs.professorHalved = true;
       text(`${bs.professor.name}'s next move will deal half damage.`);
     }
@@ -86,12 +88,13 @@ const playerEffects = {
     bs.disrupted = false;
     text('Disruption effect cleared!');
   },
-  chance_mutual_damage_30({ text, animPl }) {
-    if (Math.random() < 0.5) {
-      const from  = engine.getState().playerHP;
-      const newHP = from - 30;
+  chance_mutual_damage_30({ text, animPl, move }) {
+    if (Math.random() < (move.mutualChance ?? 0.5)) {
+      const mutualDmg = move.mutualDamage ?? 30;
+      const from      = engine.getState().playerHP;
+      const newHP     = from - mutualDmg;
       engine.setPlayerHP(newHP);
-      text('You take 20 damage from the mutual exchange.');
+      text(`You take ${mutualDmg} damage from the mutual exchange.`);
       animPl(from, Math.max(0, newHP));
       if (newHP <= 0) {
         text('You fainted!');
@@ -136,8 +139,8 @@ const opponentEffects = {
     text('Your next move will deal half damage!');
   },
   self_damage({ bs, text, animP, move, opponentType, opponentId }) {
-    // Professor: 25% of original move damage. Student NPC: flat 10.
-    const recoil   = opponentType === 'student' ? 10 : Math.floor(move.damage * 0.25);
+    // Professor: 25% of original move damage. Student NPC: move.recoilAmount or flat 10.
+    const recoil   = opponentType === 'student' ? (move.recoilAmount ?? 10) : Math.floor(move.damage * 0.25);
     const fromPH   = bs.professorHP;
     bs.professorHP = Math.max(0, bs.professorHP - recoil);
     text(`${bs.professor.name} takes ${recoil} recoil damage.`);
@@ -152,8 +155,8 @@ const opponentEffects = {
     bs.playerSkipped = true;
     text("You are disrupted — you'll skip your next action!");
   },
-  chance_skip_opponent({ bs, text }) {
-    if (Math.random() < 0.5) {
+  chance_skip_opponent({ bs, text, move }) {
+    if (Math.random() < (move.skipChance ?? 0.5)) {
       bs.playerSkipped = true;
       text("You are disrupted — you'll skip your next action!");
     } else {
@@ -165,8 +168,8 @@ const opponentEffects = {
     bs.disrupted = true;
     text('Your next move will deal half damage!');
   },
-  chance_halve_opponent({ bs, text }) {
-    if (Math.random() < 0.25) {
+  chance_halve_opponent({ bs, text, move }) {
+    if (Math.random() < (move.halveChance ?? 0.25)) {
       bs.disrupted = true;
       text('Your next move will deal half damage!');
     }
@@ -192,7 +195,7 @@ const opponentEffects = {
     const oldHP    = bs.professorHP;
     bs.professorHP = Math.min(bs.professor.hp, bs.professorHP + healAmt);
     const gained   = bs.professorHP - oldHP;
-    bs.playerReducedNext10 += 10;
+    bs.playerReducedNext10 += (move.reduceAmount ?? 10);
     text(`${bs.professor.name} recovers ${gained} HP. Your next move is weakened.`);
     animP(oldHP, bs.professorHP);
   },
@@ -205,8 +208,8 @@ const opponentEffects = {
     text(`${bs.professor.name} recovers ${gained} HP and braces for impact.`);
     animP(oldHP, bs.professorHP);
   },
-  reduce_next_10({ bs, text }) {
-    bs.playerReducedNext10 += 10;
+  reduce_next_10({ bs, text, move }) {
+    bs.playerReducedNext10 += (move.reduceAmount ?? 10);
     text('Your next move is weakened.');
   },
   self_vuln_next({ bs }) {
@@ -237,8 +240,8 @@ const opponentEffects = {
     bs.disrupted = false;
     text('Your last buff is nullified!');
   },
-  chance_boost_next_10({ bs }) {
-    if (Math.random() < 0.5) bs.npcBoostNext10 = true;
+  chance_boost_next_10({ bs, move }) {
+    if (Math.random() < (move.boostChance ?? 0.5)) bs.npcBoostNext10 = true;
   },
   boost_next_2({ bs, text }) {
     bs.npcBoostedTurns = 2;
@@ -250,10 +253,11 @@ const opponentEffects = {
   chance_bonus_10() {
     // Roll handled pre-damage in applyOpponentTurn; no post-damage state.
   },
-  chance_mutual_damage_30({ bs, text, animP, opponentType, opponentId }) {
-    const fromPH2  = bs.professorHP;
-    bs.professorHP = Math.max(0, bs.professorHP - 30);
-    text(`${bs.professor.name} also takes 30 damage!`);
+  chance_mutual_damage_30({ bs, text, animP, opponentType, opponentId, move }) {
+    const mutualDmg = move.mutualDamage ?? 30;
+    const fromPH2   = bs.professorHP;
+    bs.professorHP  = Math.max(0, bs.professorHP - mutualDmg);
+    text(`${bs.professor.name} also takes ${mutualDmg} damage!`);
     animP(fromPH2, bs.professorHP);
     if (bs.professorHP <= 0) {
       if (opponentType === 'professor') engine.defeatProfessor(opponentId);
@@ -262,9 +266,11 @@ const opponentEffects = {
     }
   },
   chain_hit_3({ bs, text, animPl, move }) {
-    // First hit already applied in applyOpponentTurn. Each extra hit has 50% chance (max 2).
+    // First hit already applied in applyOpponentTurn. Each extra hit has chainHitChance (max maxChainHits - 1).
     let extraHits = 0;
-    while (extraHits < 2 && Math.random() < 0.5) {
+    const maxExtra  = (move.maxChainHits ?? 3) - 1;
+    const hitChance = move.chainHitChance ?? 0.5;
+    while (extraHits < maxExtra && Math.random() < hitChance) {
       const fromPH3 = engine.getState().playerHP;
       const toPH3   = fromPH3 - move.damage;
       engine.setPlayerHP(toPH3);
@@ -367,8 +373,8 @@ export function applyPlayerMove(ctx) {
     bs.npcIncomingHalved = false;
   }
 
-  if (move.effect === 'chance_fail' && Math.random() < 0.2)   playerDamage = 0;
-  if (move.effect === 'chance_bonus_10' && Math.random() < 0.3) playerDamage += 10;
+  if (move.effect === 'chance_fail'     && Math.random() < (move.failureChance ?? 0.2))   playerDamage = 0;
+  if (move.effect === 'chance_bonus_10' && Math.random() < (move.bonusChance ?? 0.3)) playerDamage += (move.bonusAmount ?? 10);
 
   const fromProfHP = bs.professorHP;
   bs.professorHP   = Math.max(0, bs.professorHP - playerDamage);
@@ -447,11 +453,11 @@ export function applyOpponentTurn(ctx) {
   if (bs.npcBoostNext10)  { profDamage += 10; bs.npcBoostNext10  = false; }
   if (bs.npcBoostedTurns > 0) { profDamage += 20; bs.npcBoostedTurns--; }
 
-  // chance_mutual_damage_30: chance for player to also take exactly 30; NPC side handled in the effect handler.
-  if (oppMove.effect === 'chance_mutual_damage_30') profDamage = 30;
+  // chance_mutual_damage_30: NPC mutual damage uses move.mutualDamage; NPC side handled in the effect handler.
+  if (oppMove.effect === 'chance_mutual_damage_30') profDamage = oppMove.mutualDamage ?? 30;
 
-  if (oppMove.effect === 'chance_fail'     && Math.random() < 0.2) profDamage = 0;
-  if (oppMove.effect === 'chance_bonus_10' && Math.random() < 0.3) profDamage += 10;
+  if (oppMove.effect === 'chance_fail'     && Math.random() < (oppMove.failureChance ?? 0.2)) profDamage = 0;
+  if (oppMove.effect === 'chance_bonus_10' && Math.random() < (oppMove.bonusChance ?? 0.3))   profDamage += (oppMove.bonusAmount ?? 10);
   if (oppMove.effect === 'conditional_damage' && bs.lastPlayerDamage >= 30) profDamage = 40;
 
   profDamage = Math.max(0, profDamage - engine.getState().defenseStat);

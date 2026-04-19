@@ -18,23 +18,29 @@ Owns the single `gameState` object — the authoritative record of everything th
 ```js
 {
   activeScene: string,         // current scene: 'overworld' | 'battle'
-  playerHP: number,            // current player HP (max: 100)
+  playerHP: number,            // current player HP (clamped to [0, playerMaxHP])
+  playerMaxHP: number,         // maximum player HP; starts at 100, grows by 5*level on each level-up
   playerPosition: {            // player's tile coordinates in the current region
     x: number,
     y: number,
   },
-  currentRegion: string,       // active map region id (e.g. 'outdoor', 'main_building')
+  currentRegion: string,       // active map region id (e.g. 'outdoor_campus', 'main_building')
   defeatedProfessors: array,   // ids of defeated professors, in defeat order
   pendingEncounter: string|null, // professor id set by map.js when player steps on trigger; null otherwise
   // Progression — persist across faints; reset only on page reload (no save/load)
   xp: number,                  // accumulated XP within the session (starts at 0)
   level: number,               // current player level (starts at 1)
-  xpToNextLevel: number,       // XP threshold for the next level-up
+  xpToNextLevel: number,       // XP threshold for the next level-up (starts at 70)
   damageBuff: number,          // flat bonus added to all player move damage
   defenseStat: number,         // flat reduction applied to all incoming damage (min 0)
   // Move loadout — persist across faints; reset only on page reload
   learnedMoves: string[],      // all move IDs the player has unlocked (starts with 4 default moves)
   activeMoves: string[],       // ordered 4-move battle loadout (subset of learnedMoves)
+  // Inventory
+  inventory: { itemId: string, qty: number }[], // consumables and key items carried
+  expBoost: number,            // flat XP bonus consumed by the next awardXP() call; reset to 0 after use
+  activeItems: string[],       // ordered item IDs in the pre-battle loadout (max 4 consumables)
+  spentItems: string[],        // IDs of non-reloadable consumables used this session
 }
 ```
 
@@ -47,7 +53,7 @@ Owns the single `gameState` object — the authoritative record of everything th
 - **Does:** Sets `gameState` to its starting values.
 - **Inputs:** none
 - **Returns:** void
-- **Side effects:** Writes initial values to `gameState`: `activeScene: 'overworld'`, `playerHP: 100`, `playerPosition: { x: <pond start>, y: <pond start> }`, `currentRegion: 'outdoor'`, `defeatedProfessors: []`, `pendingEncounter: null`, `xp: 0`, `level: 1`, `xpToNextLevel: 100`, `damageBuff: 0`, `defenseStat: 0`, `learnedMoves: [<4 starting move IDs>]`, `activeMoves: [<4 starting move IDs>]`.
+- **Side effects:** Writes initial values to `gameState`: `activeScene: 'overworld'`, `playerHP: 100`, `playerMaxHP: 100`, `playerPosition: { x: <entry start>, y: <entry start> }`, `currentRegion: 'outdoor_campus'`, `defeatedProfessors: []`, `pendingEncounter: null`, `xp: 0`, `level: 1`, `xpToNextLevel: 70`, `damageBuff: 0`, `defenseStat: 0`, `learnedMoves: [<4 starting move IDs>]`, `activeMoves: [<4 starting move IDs>]`, `inventory: []`, `expBoost: 0`, `activeItems: []`, `spentItems: []`.
 
 ---
 
@@ -63,7 +69,7 @@ Owns the single `gameState` object — the authoritative record of everything th
 ### setPlayerHP(hp)
 
 - **Does:** Updates the player's current HP.
-- **Inputs:** `hp` — number: new HP value. Clamped to `[0, 100]`.
+- **Inputs:** `hp` — number: new HP value. Clamped to `[0, playerMaxHP]`.
 - **Returns:** void
 - **Side effects:** Writes `gameState.playerHP`. If `hp <= 0`, also calls `resetGame()`.
 
@@ -125,9 +131,9 @@ Owns the single `gameState` object — the authoritative record of everything th
 
 ### allProfessorsDefeated()
 
-- **Does:** Checks whether all five pre-castle professors have been defeated.
+- **Does:** Checks whether all six pre-castle professors have been defeated.
 - **Inputs:** none
-- **Returns:** boolean: `true` if `defeatedProfessors` contains all five non-final professor ids.
+- **Returns:** boolean: `true` if `defeatedProfessors` contains all six non-final-boss professor ids. Excludes only `prof_vec_tor` (the final boss, encountered inside the castle). Includes `prof_parsemore` (the secret boss, encountered before the castle).
 - **Side effects:** none
 
 ---
@@ -137,7 +143,7 @@ Owns the single `gameState` object — the authoritative record of everything th
 - **Does:** Resets game state to starting values — used on player faint.
 - **Inputs:** none
 - **Returns:** void
-- **Side effects:** Restores `playerHP`, `playerPosition`, `currentRegion`, and `activeScene` to starting values. Does **not** clear `defeatedProfessors`, `xp`, `level`, `xpToNextLevel`, `damageBuff`, `defenseStat`, `learnedMoves`, or `activeMoves` — all progression and move state persists across faints. State resets to zero only when `init()` is called (page load).
+- **Side effects:** Restores `playerHP` to `playerMaxHP`, and resets `playerPosition`, `currentRegion`, and `activeScene` to starting values. Does **not** clear `defeatedProfessors`, `xp`, `level`, `xpToNextLevel`, `playerMaxHP`, `damageBuff`, `defenseStat`, `learnedMoves`, `activeMoves`, or `inventory` — all progression, move state, and items persist across faints. State resets to zero only when `init()` is called (page load).
 
 ---
 
@@ -147,6 +153,69 @@ Owns the single `gameState` object — the authoritative record of everything th
 - **Inputs:** `amount` — number: XP to award.
 - **Returns:** boolean: `true` if a level-up occurred, `false` otherwise. (Used by BattleScene to trigger the level-up UI message.)
 - **Side effects:** Increments `gameState.xp`. If `xp >= xpToNextLevel`: increments `level`, resets `xp` to the carry-over remainder, updates `xpToNextLevel` (constant or per-level formula), increments `damageBuff` and `defenseStat` by their per-level amounts.
+
+---
+
+### addDamageBuff(n)
+
+- **Does:** Increases `gameState.damageBuff` by `n`.
+- **Inputs:** `n` — number: amount to add.
+- **Returns:** void
+- **Side effects:** Writes `gameState.damageBuff`.
+
+---
+
+### addDefenseStat(n)
+
+- **Does:** Increases `gameState.defenseStat` by `n`.
+- **Inputs:** `n` — number: amount to add.
+- **Returns:** void
+- **Side effects:** Writes `gameState.defenseStat`.
+
+---
+
+### addItem(itemId)
+
+- **Does:** Adds an item to the player's inventory.
+- **Inputs:** `itemId` — string: id of the item to add (must exist in `data.items`).
+- **Returns:** void
+- **Side effects:** If the item is a `consumable` or `key_item`: finds or creates an inventory entry and increments `qty`. If the item is an `upgrade`: immediately applies its effect (e.g. `boost_defense` increments `defenseStat`) and records it in inventory with `qty: 1` for reference.
+
+---
+
+### hasItem(itemId)
+
+- **Does:** Checks whether the player currently holds at least one of the given item.
+- **Inputs:** `itemId` — string.
+- **Returns:** boolean: `true` if the item exists in inventory with `qty > 0`.
+- **Side effects:** none
+
+---
+
+### removeItem(itemId)
+
+- **Does:** Decrements the quantity of an item in inventory by 1.
+- **Inputs:** `itemId` — string.
+- **Returns:** void
+- **Side effects:** Decrements `qty` for the inventory entry. If `qty` reaches 0, the entry remains in the array but `hasItem()` returns false. No-op if the item is not in inventory.
+
+---
+
+### useItem(itemId)
+
+- **Does:** Applies a consumable item's effect and removes it from inventory.
+- **Inputs:** `itemId` — string.
+- **Returns:** object|null: the item definition if the item was used; `null` if the item is not in inventory.
+- **Side effects:** Applies the item's `effect.action` to game state (e.g. `restore_hp` increases `playerHP`, `boost_exp` increases `expBoost`, `boost_attack` increases `damageBuff`, `boost_defense` increases `defenseStat`). A `null` effect value for `restore_hp` restores HP to `playerMaxHP`. Calls `removeItem(itemId)` after applying.
+
+---
+
+### getConsumables()
+
+- **Does:** Returns all consumable items currently in inventory with quantity > 0.
+- **Inputs:** none
+- **Returns:** `{ itemId: string, qty: number }[]`: filtered and non-empty entries from `inventory` where the item category is `'consumable'`.
+- **Side effects:** none
 
 ---
 

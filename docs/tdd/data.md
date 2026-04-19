@@ -17,11 +17,11 @@ The data layer is split into domain files for LLM-context efficiency. Each file 
 
 | File | Exports | Consumed by |
 |------|---------|-------------|
-| `professors.js` | `professorMoves`, `professors` | `BattleScene`, `BattleModeScene`, `engine` |
-| `playerMoves.js` | `playerMoves` | `BattleScene` |
-| `students.js` | `npcMoves`, `studentNPCs` | `BattleScene` |
+| `professors.js` | `professors` | `BattleScene`, `BattleModeScene`, `engine` |
+| `moves.js` | `playerMoves`, `professorMoves`, `npcMoves` | `BattleScene`, `MoveKioskScene`, `engine` |
+| `students.js` | `studentNPCs` | `BattleScene`, `BattleModeScene` |
 | `ambientNpcs.js` | `ambientNPCs` | `OverworldScene` |
-| `items.js` | `items` | `BattleScene`, overworld item interactions |
+| `items.js` | `items` | `BattleScene`, `engine`, overworld item interactions |
 | `regions.js` | `TILE`, `regions` | `engine`, `OverworldScene` |
 | `dialogue.js` | `dialogueSequences` | `DialogueScene` |
 | `audio.js` | `audioTracks` | `AudioScene` |
@@ -48,7 +48,11 @@ The data layer is split into domain files for LLM-context efficiency. Each file 
     postWin: string,    // key into dialogueSequences
     postLoss: string,   // key into dialogueSequences
   },
-  sprite: string,       // path to professor sprite sheet
+  sprite: string,       // path to primary sprite image (used as fallback and sprites[0])
+  sprites?: string[],   // optional: array of 3 sprite paths [l1, l2, l3] for HP-tier visuals;
+                        // present only for professors with multi-level sprite art.
+                        // sprites[0] must equal sprite.
+  battleMusic: string,  // audioTrack id for this professor's battle music
 }
 ```
 
@@ -129,7 +133,7 @@ Non-battle NPCs encountered in the overworld. Interaction triggers dialogue and 
     region: string,
     tile: { x: number, y: number },
   },
-  dialogue: string[],   // ordered array of dialogue lines (no speaker object — NPC always speaks)
+  dialogue: string,     // key into dialogueSequences (the NPC's interaction sequence)
   reward?: string,      // item id given on interaction; omit if no reward
   repeatableReward: boolean, // true = item is given each time player interacts
 }

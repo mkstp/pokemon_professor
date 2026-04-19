@@ -88,7 +88,6 @@ export const studentNPCs = [
       preBattle: 'student_halvorsen_pre',
       postWin:   'student_halvorsen_win',
       postLoss:  'student_halvorsen_loss',
-      reward:    'student_halvorsen_reward',
     },
     sprite: 'assets/sprites/battle/student_halvorsen.png',
   },
@@ -101,7 +100,9 @@ export const studentNPCs = [
       preBattle: 'student_antaeus_pre',
       postWin:   'student_antaeus_win',
       postLoss:  'student_antaeus_loss',
+      reward:    'student_antaeus_reward',
     },
+    reward: 'meaningful_spaghetti',
     sprite: 'assets/sprites/battle/student_antaeus.png',
   },
   {

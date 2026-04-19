@@ -8,7 +8,8 @@ import { professors } from '../js/data/professors.js';
 import { playerMoves } from '../js/data/moves.js';
 
 // IDs of all professors who must be defeated before the castle unlocks.
-// Mirrors the PRE_CASTLE_PROFESSOR_IDS slice in engine.js (all except the last).
+// Mirrors the PRE_CASTLE_PROFESSOR_IDS slice in engine.js (all except vec_tor, the final boss).
+// Includes parsemore (secret boss) — encountered before the castle, counts toward the gate.
 const PRE_CASTLE_IDS = professors.slice(0, -1).map(p => p.id);
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
@@ -41,21 +42,21 @@ test('setPlayerHP() updates playerHP to the given value', () => {
   assert.equal(engine.getState().playerHP, 75);
 });
 
-test('setPlayerHP() clamps above 100 to 100', () => {
+test('setPlayerHP() clamps above playerMaxHP to playerMaxHP', () => {
   engine.init();
   engine.setPlayerHP(150);
-  assert.equal(engine.getState().playerHP, 100);
+  assert.equal(engine.getState().playerHP, engine.getState().playerMaxHP);
 });
 
 // ─── LOSS STATE ───────────────────────────────────────────────────────────────
 // When HP hits 0, engine.setPlayerHP() calls resetGame() automatically.
 // Expected: HP restores to 100, region resets, scene resets — but progress survives.
 
-test('setPlayerHP(0) restores playerHP to 100 (faint and respawn)', () => {
+test('setPlayerHP(0) restores playerHP to playerMaxHP (faint and respawn)', () => {
   engine.init();
   engine.setPlayerHP(50);
   engine.setPlayerHP(0);
-  assert.equal(engine.getState().playerHP, 100, 'HP should be fully restored after fainting');
+  assert.equal(engine.getState().playerHP, engine.getState().playerMaxHP, 'HP should be fully restored after fainting');
 });
 
 test('setPlayerHP(0) resets currentRegion to outdoor_campus', () => {
@@ -85,7 +86,7 @@ test('negative HP argument also triggers faint and respawn', () => {
   engine.init();
   engine.setPlayerHP(10);
   engine.setPlayerHP(-5);
-  assert.equal(engine.getState().playerHP, 100, 'negative HP should clamp to 0 and trigger reset');
+  assert.equal(engine.getState().playerHP, engine.getState().playerMaxHP, 'negative HP should clamp to 0 and trigger reset');
 });
 
 // ─── WIN STATE ────────────────────────────────────────────────────────────────
@@ -219,7 +220,7 @@ test('awardXP() returns false when no level-up occurs', () => {
 
 test('awardXP() returns true when XP reaches the level-up threshold', () => {
   engine.init();
-  const leveledUp = engine.awardXP(100);
+  const leveledUp = engine.awardXP(70); // XP_PER_LEVEL = 70
   assert.equal(leveledUp, true);
 });
 
@@ -231,8 +232,8 @@ test('awardXP() increments level on level-up', () => {
 
 test('awardXP() carries over excess XP after level-up', () => {
   engine.init();
-  engine.awardXP(100); // threshold 70 — 30 XP should carry over
-  assert.equal(engine.getState().xp, 30);
+  engine.awardXP(85); // 85 - 70 (threshold) = 15 carry-over
+  assert.equal(engine.getState().xp, 15);
 });
 
 test('awardXP() increases damageBuff on level-up', () => {
@@ -453,12 +454,12 @@ test('useItem() returns null when item is not in inventory', () => {
   assert.equal(result, null, 'should return null if item is not in inventory');
 });
 
-test('useItem() with full-restore item (null value) restores HP to 100', () => {
+test('useItem() with full-restore item (null value) restores HP to playerMaxHP', () => {
   engine.init();
   engine.setPlayerHP(30);
   engine.addItem('carls_large_cheese_steak_sub'); // effect: restore_hp, value: null
   engine.useItem('carls_large_cheese_steak_sub');
-  assert.equal(engine.getState().playerHP, 100, 'null HP restore value should fully restore HP');
+  assert.equal(engine.getState().playerHP, engine.getState().playerMaxHP, 'null HP restore value should fully restore HP');
 });
 
 test('useItem() with boost_exp consumable increases expBoost', () => {

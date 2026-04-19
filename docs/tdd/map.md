@@ -7,7 +7,7 @@
 
 ## Responsibility
 
-Renders the tile-based campus map and handles all overworld gameplay: player movement, encounter trigger detection, and region transitions. Delegates weather effects to `visuals.js`. Transitions to `BattleScene` on encounter; launches `DialogueScene` for overworld dialogue.
+Renders the tile-based campus map and handles all overworld gameplay: player movement, encounter trigger detection, region transitions, ambient NPC interactions, and item kiosk access. Delegates weather effects to `visuals.js`. Transitions to `BattleScene` on professor encounter; launches `DialogueScene` for overworld dialogue and ambient NPC interactions; launches `MoveKioskScene` for move loadout management.
 
 ---
 
@@ -71,15 +71,31 @@ None. Scene-level references (player sprite, active tilemap layers, weather emit
 
 ---
 
+### checkAmbientNPCInteraction(x, y)
+
+- **Does:** Checks whether the player is adjacent to an ambient NPC and the interaction key is pressed.
+- **Inputs:** `x` — number: tile column; `y` — number: tile row.
+- **Returns:** void
+- **Side effects:** Reads `data.ambientNPCs` for the current region. If the player is adjacent to an NPC tile and presses the interact key, launches `DialogueScene` with the NPC's dialogue sequence key. If the NPC has a `reward` and (`repeatableReward` is true or the item has not been given yet), calls `engine.addItem(reward)` after dialogue completes.
+
+---
+
+### Move Kiosk Access
+
+The move kiosk is accessible from a designated tile in the overworld (e.g. a notice board or locker). When the player steps on or interacts with the kiosk tile, `MoveKioskScene` is launched as an overlay. On exit, the overworld resumes with the updated active move loadout from engine state.
+
+---
+
 ## Module Interfaces
 
 **Reads from:**
-- `engine` — player position, current region, defeated professors; `isDefeated()`, `allProfessorsDefeated()`, `setPlayerPosition()`, `setRegion()`, `setPendingEncounter()`
-- `data` — region tile maps, encounter tiles, region connections, weather effects
+- `engine` — player position, current region, defeated professors; `isDefeated()`, `allProfessorsDefeated()`, `setPlayerPosition()`, `setRegion()`, `setPendingEncounter()`, `addItem()`
+- `data` — region tile maps, encounter tiles, region connections, weather effects, `ambientNPCs`
 - `visuals` — `createWeather(scene, weatherType)`, called in `create()`
 
 **Exposes to:**
 - `main.js` — registered as `'OverworldScene'`; first scene started on game launch
-- `BattleScene` — started via `this.scene.start('BattleScene', { professorId })` after pre-battle dialogue completes
-- `DialogueScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })` for pre/post-encounter dialogue
+- `BattleScene` — started via `this.scene.start('BattleScene', { opponentType, opponentId })` after pre-battle dialogue completes
+- `DialogueScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })` for pre/post-encounter dialogue and ambient NPC interactions
+- `MoveKioskScene` — launched as overlay when player accesses the move kiosk tile
 - `AudioScene` — accessed via `this.scene.get('AudioScene').switchTo(trackId)`
