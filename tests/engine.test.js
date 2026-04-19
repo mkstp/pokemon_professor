@@ -231,7 +231,7 @@ test('awardXP() increments level on level-up', () => {
 
 test('awardXP() carries over excess XP after level-up', () => {
   engine.init();
-  engine.awardXP(130); // threshold 100 — 30 XP should carry over
+  engine.awardXP(100); // threshold 70 — 30 XP should carry over
   assert.equal(engine.getState().xp, 30);
 });
 
@@ -247,11 +247,25 @@ test('awardXP() increases defenseStat on level-up', () => {
   assert.ok(engine.getState().defenseStat > 0, 'defenseStat should increase after level-up');
 });
 
+test('awardXP() increases playerMaxHP by 5*level on level-up', () => {
+  engine.init();
+  engine.awardXP(70); // level 1 → 2, gain = 5*1 = 5
+  assert.equal(engine.getState().playerMaxHP, 105);
+});
+
+test('awardXP() restores playerHP to new playerMaxHP on level-up', () => {
+  engine.init();
+  engine.setPlayerHP(50); // take some damage
+  engine.awardXP(70); // level up
+  const { playerHP, playerMaxHP } = engine.getState();
+  assert.equal(playerHP, playerMaxHP, 'HP should be fully restored to new max on level-up');
+});
+
 test('awardXP() accumulates across multiple calls without level-up', () => {
   engine.init();
   engine.awardXP(30);
-  engine.awardXP(40);
-  assert.equal(engine.getState().xp, 70);
+  engine.awardXP(39); // 69 total — just under the 70 threshold
+  assert.equal(engine.getState().xp, 69);
 });
 
 // ─── XP persistence across faint ────────────────────────────────────────────

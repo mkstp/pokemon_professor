@@ -19,7 +19,7 @@
             "type": "command"
           },
           {
-            "command": "date +%s > .claude/session_start.tmp",
+            "command": "[ -d .beads ] && date +%s > .claude/session_start.tmp",
             "type": "command"
           }
         ],

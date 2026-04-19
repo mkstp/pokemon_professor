@@ -20,7 +20,7 @@ const STARTING_REGION = 'outdoor_campus';
 export const STARTING_HP = 100;
 const STARTING_LEVEL  = 1;
 const STARTING_XP     = 0;
-const XP_PER_LEVEL    = 100; // XP required to reach each successive level
+const XP_PER_LEVEL    = 70;  // XP required to reach each successive level
 
 // The 4 moves the player starts with and uses as their default battle loadout.
 // IDs must match entries in the playerMoves array in data/moves.js.
@@ -29,6 +29,7 @@ const STARTING_MOVE_IDS = ['impostor_syndrome', 'hot_take', 'non_sequitur', 'und
 // Per-level stat gains applied when awardXP() triggers a level-up.
 const DAMAGE_BUFF_PER_LEVEL  = 2; // flat bonus added to all player move damage
 const DEFENSE_BUFF_PER_LEVEL = 2; // flat reduction applied to all incoming damage
+const HP_GAIN_FACTOR         = 5; // HP gained at level N = HP_GAIN_FACTOR * N (5, 10, 15, …)
 
 // Module-level state object. Private — never exported directly.
 let gameState = {};
@@ -38,6 +39,7 @@ export function init() {
   gameState = {
     activeScene:        'overworld',
     playerHP:           STARTING_HP,
+    playerMaxHP:        STARTING_HP,
     playerPosition:     { ...regions[STARTING_REGION].entryPosition },
     currentRegion:      STARTING_REGION,
     defeatedProfessors: [],
@@ -65,10 +67,10 @@ export function getState() {
   return gameState;
 }
 
-// Updates the player's current HP. Clamped to [0, 100].
+// Updates the player's current HP. Clamped to [0, playerMaxHP].
 // If hp reaches zero, calls resetGame() — triggers the faint handler.
 export function setPlayerHP(hp) {
-  const clamped = Math.max(0, Math.min(100, hp));
+  const clamped = Math.max(0, Math.min(gameState.playerMaxHP, hp));
   gameState.playerHP = clamped;
   if (clamped <= 0) {
     resetGame();
@@ -130,9 +132,12 @@ export function awardXP(amount) {
   gameState.xp += total;
   if (gameState.xp >= gameState.xpToNextLevel) {
     gameState.xp          -= gameState.xpToNextLevel;
+    const hpGain           = HP_GAIN_FACTOR * gameState.level; // gain(N) = 5N before increment
     gameState.level       += 1;
     gameState.damageBuff  += DAMAGE_BUFF_PER_LEVEL;
     gameState.defenseStat += DEFENSE_BUFF_PER_LEVEL;
+    gameState.playerMaxHP += hpGain;
+    gameState.playerHP     = gameState.playerMaxHP;
     return true;
   }
   return false;
@@ -159,7 +164,7 @@ function applyItemEffect(item) {
   const { action, value } = item.effect;
   switch (action) {
     case 'restore_hp':
-      setPlayerHP(value === null ? STARTING_HP : gameState.playerHP + value);
+      setPlayerHP(value === null ? gameState.playerMaxHP : gameState.playerHP + value);
       break;
     case 'boost_attack':
       gameState.damageBuff += value;
@@ -293,7 +298,7 @@ export function addDefenseStat(n) {
 // Called automatically by setPlayerHP() when HP hits zero.
 export function resetGame() {
   gameState.activeScene = 'overworld';
-  gameState.playerHP = STARTING_HP;
+  gameState.playerHP = gameState.playerMaxHP;
   gameState.playerPosition = { ...regions[STARTING_REGION].entryPosition };
   gameState.currentRegion = STARTING_REGION;
   gameState.pendingEncounter = null;

@@ -11,7 +11,7 @@
 //             data/students.js, data/moves.js
 
 import * as engine from '../engine.js';
-import { STARTING_HP } from '../engine.js';
+
 import { professors }                            from '../data/professors.js';
 import { studentNPCs }                           from '../data/students.js';
 import { playerMoves, professorMoves, npcMoves } from '../data/moves.js';
@@ -557,13 +557,14 @@ export default class BattleScene extends Phaser.Scene {
 
   // Redraws the player HP bar and numeric counter at the given hp value.
   _drawPlayerHPBar(hp) {
-    const ratio = Math.max(0, hp / STARTING_HP);
+    const maxHP = engine.getState().playerMaxHP;
+    const ratio = Math.max(0, hp / maxHP);
     this.playerHPBar.clear();
     this.playerHPBar.fillStyle(0xcccccc);
     this.playerHPBar.fillRect(PLAYER_HP_BAR_X, PLAYER_HP_BAR_Y, HP_BAR_W, HP_BAR_H);
     this.playerHPBar.fillStyle(this._hpColour(ratio));
     this.playerHPBar.fillRect(PLAYER_HP_BAR_X, PLAYER_HP_BAR_Y, Math.floor(HP_BAR_W * ratio), HP_BAR_H);
-    this.playerHPText.setText(`${Math.max(0, Math.round(hp))}/${STARTING_HP}`);
+    this.playerHPText.setText(`${Math.max(0, Math.round(hp))}/${maxHP}`);
   }
 
   // Redraws the player XP bar beneath the HP bar at the given xp / xpToNextLevel values.
@@ -688,7 +689,7 @@ export default class BattleScene extends Phaser.Scene {
   _animatePlayerHP(from, to, next) {
     if (from > to) {
       this.cameras.main.shake(300, 0.008);
-      this._playHitSfx(from - to, STARTING_HP);
+      this._playHitSfx(from - to, engine.getState().playerMaxHP);
     }
     this.tweens.addCounter({
       from, to,
@@ -866,6 +867,11 @@ export default class BattleScene extends Phaser.Scene {
         seq.push(next => this._animatePlayerXP(xpBefore, xpMaxBefore, xpMaxBefore, next));
         seq.push(next => this._showLine(`You earned ${amount} XP!`, next));
         seq.push(next => this._showLine(`Level up! You reached level ${level}.`, next));
+        seq.push(next => {
+          const { playerHP, playerMaxHP } = engine.getState();
+          this._drawPlayerHPBar(playerHP);
+          this._showLine(`HP restored to ${playerMaxHP}!`, next);
+        });
         seq.push(next => {
           this._drawPlayerXPBar(xpAfter, xpMaxAfter);
           this.playerLevelText.setText(`Lv.${level}`);
