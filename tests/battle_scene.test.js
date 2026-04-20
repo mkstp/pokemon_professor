@@ -39,9 +39,31 @@ function makeCtx(bs, opponentType = 'professor', opponentId = 'prof_schwaartz') 
   return { bs, seq, text, animP, animPl, opponentType, opponentId };
 }
 
+// Returns a fresh symmetric entity object with all fields at their default values.
+function makeEntity({ hp = 100, maxHP = 100, name = 'Test' } = {}) {
+  return {
+    hp, maxHP, name,
+    skippedTurns:    0,
+    outgoingHalved:  false,
+    outgoingDoubled: false,
+    outgoingBonus:   0,
+    boostedTurns:    0,
+    boostedAmount:   0,
+    vulnTurns:       0,
+    vulnBonus:       5,
+    incomingHalved:  false,
+    reducedNext:     0,
+    priority:        false,
+    lastDamage:      0,
+    lastEffect:      null,
+    pendingSwapped:  null,
+    deferredIncoming: 0,
+    lockedMove:      null,
+  };
+}
+
 // Creates a minimal battleState for testing.
-// opponentMoves[] is an array of valid move IDs (professorMove or npcMove);
-// it is set as bs.professor.moves so _applyOpponentTurn can look them up.
+// professorMoves[] is an array of valid move IDs used by the opponent.
 function makeBattleState({ professorMoves = ['minimal_pair'], professorHP = 100 } = {}) {
   return {
     professor: {
@@ -50,7 +72,8 @@ function makeBattleState({ professorMoves = ['minimal_pair'], professorHP = 100 
       hp:    professorHP,
       moves: professorMoves,
     },
-    professorHP,
+    player:   makeEntity({ hp: 100, maxHP: 100, name: 'You' }),
+    opponent: makeEntity({ hp: professorHP, maxHP: professorHP, name: 'Prof. Schwaartz' }),
     playerMoves:         [],
     selectedMoveIndex:   0,
     menuLevel:           'action',
@@ -59,30 +82,6 @@ function makeBattleState({ professorMoves = ['minimal_pair'], professorHP = 100 
     itemScrollOffset:    0,
     phase:               'resolve',
     outcome:             null,
-    disrupted:           false,
-    professorSkipped:    false,
-    professorHalved:     false,
-    deferredDamage:      0,
-    lastProfessorDamage: 0,
-    // New fields for student NPC / npcMove effects.
-    playerSkipped:       false,
-    npcSkippedTurns:     0,
-    npcHalvedNext:       false,
-    npcDoubledNext:      false,
-    npcBoostNext10:      false,
-    npcBoostedTurns:     0,
-    npcVulnTurns:        0,
-    npcIncomingHalved:   false,
-    playerReducedNext10:         0,
-    lastPlayerDamage:            0,
-    npcRevealedMove:             null,
-    npcPriority:                 false,
-    lastNpcEffect:               null,
-    pendingSwappedEffect:        null,
-    playerLockedMove:            null,
-    playerPriority:              false,
-    lastPlayerEffect:            null,
-    pendingPlayerSwappedEffect:  null,
   };
 }
 
@@ -109,14 +108,14 @@ test('applyDeferredDamage: returns false and adds nothing to seq when deferredDa
 test('applyDeferredDamage: deducts damage, pushes text+animPl, returns false when player survives', () => {
   engine.init(); // playerHP = 100
   const bs  = makeBattleState();
-  bs.deferredDamage = 20;
+  bs.player.deferredIncoming = 20;
   const ctx = makeCtx(bs);
 
   const result = applyDeferredDamage(ctx);
 
   assert.equal(result, false, 'player survives — should return false');
-  assert.equal(bs.deferredDamage, 0, 'deferredDamage should be cleared after application');
-  assert.equal(bs.lastProfessorDamage, 20, 'lastProfessorDamage should record the deferred amount');
+  assert.equal(bs.player.deferredIncoming, 0, 'deferredIncoming should be cleared after application');
+  assert.equal(bs.opponent.lastDamage, 20, 'opponent.lastDamage should record the deferred amount');
   assert.equal(engine.getState().playerHP, 80, 'engine playerHP should drop by 20');
   assert.equal(ctx.seq.length, 2, 'seq should have exactly two steps: text + animPl');
   assert.equal(ctx.seq[0].type, 'text',   'first step should be a text line');
@@ -127,7 +126,7 @@ test('applyDeferredDamage: returns true when deferred damage kills player', () =
   engine.init();
   engine.setPlayerHP(10); // 10 HP remaining
   const bs  = makeBattleState();
-  bs.deferredDamage = 20; // 10 - 20 → death
+  bs.player.deferredIncoming = 20; // 10 - 20 → death
   const ctx = makeCtx(bs);
 
   const result = applyDeferredDamage(ctx);
@@ -137,7 +136,7 @@ test('applyDeferredDamage: returns true when deferred damage kills player', () =
 
 // ─── _applyPlayerMove ─────────────────────────────────────────────────────────
 
-test('applyPlayerMove: normal move deducts damage from professorHP and returns null', () => {
+test('applyPlayerMove: normal move deducts damage from opponent.hp and returns null', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
   bs.playerMoves       = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
@@ -147,13 +146,13 @@ test('applyPlayerMove: normal move deducts damage from professorHP and returns n
   const result = applyPlayerMove(ctx);
 
   assert.equal(result, null, 'professor survives — should return null');
-  assert.equal(bs.professorHP, 78, 'professorHP should drop by 22');
+  assert.equal(bs.opponent.hp, 78, 'opponent.hp should drop by 22');
   assert.equal(ctx.seq.length, 2, 'seq should have text + animP');
   assert.equal(ctx.seq[0].type, 'text',  'first step should be text');
   assert.equal(ctx.seq[1].type, 'animP', 'second step should be professor HP animation');
 });
 
-test('applyPlayerMove: returns win when player move drops professorHP to 0', () => {
+test('applyPlayerMove: returns win when player move drops opponent.hp to 0', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 10 });
   bs.playerMoves       = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
@@ -163,24 +162,24 @@ test('applyPlayerMove: returns win when player move drops professorHP to 0', () 
   const result = applyPlayerMove(ctx);
 
   assert.equal(result, 'win', 'should return win when professor HP ≤ 0');
-  assert.equal(bs.professorHP, 0, 'professorHP should be clamped to 0');
+  assert.equal(bs.opponent.hp, 0, 'opponent.hp should be clamped to 0');
 });
 
-test('applyPlayerMove: disrupted flag halves damage and is cleared after use', () => {
+test('applyPlayerMove: outgoingHalved halves damage and is cleared after use', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
-  bs.playerMoves       = [{ id: 'counterexample', name: 'Counterexample', damage: 40, effect: null }];
-  bs.selectedMoveIndex = 0;
-  bs.disrupted         = true;
+  bs.playerMoves           = [{ id: 'counterexample', name: 'Counterexample', damage: 40, effect: null }];
+  bs.selectedMoveIndex     = 0;
+  bs.player.outgoingHalved = true;
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorHP, 80, 'disrupted should halve 40 to 20');
-  assert.equal(bs.disrupted, false, 'disrupted flag should be cleared after use');
+  assert.equal(bs.opponent.hp, 80, 'outgoingHalved should halve 40 to 20');
+  assert.equal(bs.player.outgoingHalved, false, 'outgoingHalved flag should be cleared after use');
 });
 
-test('applyPlayerMove: skip effect sets professorSkipped', () => {
+test('applyPlayerMove: skip effect stuns opponent', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
   bs.playerMoves       = [{ id: 'cite_this', name: 'Cite This!', damage: 15, effect: 'skip' }];
@@ -189,10 +188,10 @@ test('applyPlayerMove: skip effect sets professorSkipped', () => {
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorSkipped, true, 'skip effect should set professorSkipped');
+  assert.equal(bs.opponent.skippedTurns, 1, 'skip effect should set opponent.skippedTurns to 1');
 });
 
-test('applyPlayerMove: halve_next effect sets professorHalved', () => {
+test('applyPlayerMove: halve_next effect sets opponent.outgoingHalved', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
   bs.playerMoves       = [{ id: 'non_sequitur', name: 'Non-Sequitur', damage: 0, effect: 'halve_next' }];
@@ -201,86 +200,86 @@ test('applyPlayerMove: halve_next effect sets professorHalved', () => {
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorHalved, true, 'halve_next should set professorHalved');
+  assert.equal(bs.opponent.outgoingHalved, true, 'halve_next should set opponent.outgoingHalved');
 });
 
-test('applyPlayerMove: player_recoil reduces player HP by 10', () => {
+test('applyPlayerMove: self_damage reduces player HP by recoilAmount', () => {
   engine.init(); // playerHP = 100
   const bs = makeBattleState({ professorHP: 100 });
-  bs.playerMoves       = [{ id: 'all_nighter', name: 'All-Nighter', damage: 38, effect: 'player_recoil' }];
+  bs.playerMoves       = [{ id: 'all_nighter', name: 'All-Nighter', damage: 38, effect: 'self_damage', recoilAmount: 10 }];
   bs.selectedMoveIndex = 0;
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(engine.getState().playerHP, 90, 'player_recoil should deal 10 HP to player');
+  assert.equal(engine.getState().playerHP, 90, 'self_damage should deal 10 HP to player');
 });
 
-test('applyPlayerMove: counter deals 40 damage when lastProfessorDamage >= 30', () => {
+test('applyPlayerMove: counter deals 40 damage when opponent.lastDamage >= 30', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
   bs.playerMoves         = [{ id: 'correction', name: 'Correction', damage: 20, effect: 'counter' }];
   bs.selectedMoveIndex   = 0;
-  bs.lastProfessorDamage = 35; // meets the ≥ 30 threshold
+  bs.opponent.lastDamage = 35; // meets the ≥ 30 threshold
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorHP, 60, 'counter should deal 40 damage when threshold is met');
+  assert.equal(bs.opponent.hp, 60, 'counter should deal 40 damage when threshold is met');
 });
 
-test('applyPlayerMove: counter deals base damage when lastProfessorDamage < 30', () => {
+test('applyPlayerMove: counter deals base damage when opponent.lastDamage < 30', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
   bs.playerMoves         = [{ id: 'correction', name: 'Correction', damage: 20, effect: 'counter' }];
   bs.selectedMoveIndex   = 0;
-  bs.lastProfessorDamage = 10; // below threshold
+  bs.opponent.lastDamage = 10; // below threshold
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorHP, 80, 'counter should deal base 20 damage when threshold is not met');
+  assert.equal(bs.opponent.hp, 80, 'counter should deal base 20 damage when threshold is not met');
 });
 
-test('applyPlayerMove: clear_debuff effect clears disrupted flag', () => {
+test('applyPlayerMove: clear_debuff effect clears player.outgoingHalved', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
-  bs.playerMoves       = [{ id: 'hot_take', name: 'Hot Take', damage: 10, effect: 'clear_debuff' }];
-  bs.selectedMoveIndex = 0;
-  bs.disrupted         = true; // pre-existing debuff
+  bs.playerMoves           = [{ id: 'hot_take', name: 'Hot Take', damage: 10, effect: 'clear_debuff' }];
+  bs.selectedMoveIndex     = 0;
+  bs.player.outgoingHalved = true; // pre-existing debuff
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.disrupted, false, 'clear_debuff should clear the disrupted flag');
+  assert.equal(bs.player.outgoingHalved, false, 'clear_debuff should clear player.outgoingHalved');
 });
 
-test('applyPlayerMove: player_recoil killing the player returns loss', () => {
+test('applyPlayerMove: self_damage killing the player returns loss', () => {
   engine.init();
   engine.setPlayerHP(5); // 5 HP remaining — recoil will kill
   const bs = makeBattleState({ professorHP: 100 });
-  bs.playerMoves       = [{ id: 'all_nighter', name: 'All-Nighter', damage: 38, effect: 'player_recoil' }];
+  bs.playerMoves       = [{ id: 'all_nighter', name: 'All-Nighter', damage: 38, effect: 'self_damage', recoilAmount: 10 }];
   bs.selectedMoveIndex = 0;
   const ctx = makeCtx(bs);
 
   const result = applyPlayerMove(ctx);
 
-  assert.equal(result, 'loss', 'should return loss when player_recoil kills the player');
+  assert.equal(result, 'loss', 'should return loss when self_damage kills the player');
 });
 
 // ─── _applyOpponentTurn ──────────────────────────────────────────────────────
 
-test('applyOpponentTurn: skips and returns null when professorSkipped is true', () => {
+test('applyOpponentTurn: skips and returns null when opponent.skippedTurns > 0', () => {
   engine.init();
   const bs = makeBattleState();
-  bs.professorSkipped = true;
+  bs.opponent.skippedTurns = 1;
   const ctx = makeCtx(bs);
 
   const result = applyOpponentTurn(ctx);
 
   assert.equal(result, null, 'skipped turn should return null');
-  assert.equal(bs.professorSkipped, false, 'professorSkipped flag should be cleared');
-  assert.equal(ctx.seq.length, 1, 'should push exactly one text step (stunned message)');
+  assert.equal(bs.opponent.skippedTurns, 0, 'skippedTurns should decrement to 0');
+  assert.equal(ctx.seq.length, 1, 'should push exactly one text step');
   assert.equal(ctx.seq[0].type, 'text', 'step should be a text line');
 });
 
@@ -294,7 +293,7 @@ test('applyOpponentTurn: normal move deals damage and returns null', () => {
 
   assert.equal(result, null, 'normal move should return null');
   assert.equal(engine.getState().playerHP, 82, 'player HP should drop by 18 (minimal_pair damage)');
-  assert.equal(bs.lastProfessorDamage, 18, 'lastProfessorDamage should be recorded');
+  assert.equal(bs.opponent.lastDamage, 18, 'opponent.lastDamage should be recorded');
 });
 
 test('applyOpponentTurn: returns loss when professor move drops player HP to 0', () => {
@@ -308,18 +307,18 @@ test('applyOpponentTurn: returns loss when professor move drops player HP to 0',
   assert.equal(result, 'loss', 'should return loss when player HP drops to 0');
 });
 
-test('applyOpponentTurn: disrupt effect sets disrupted flag', () => {
+test('applyOpponentTurn: disrupt effect sets player.outgoingHalved', () => {
   engine.init();
-  // stress_shift: damage 16, effect 'disrupt'
-  const bs  = makeBattleState({ professorMoves: ['stress_shift'] });
+  // stress_shift: damage 16, effect 'chance_skip_opponent' — use big_o (disrupt) instead
+  const bs  = makeBattleState({ professorMoves: ['big_o'] });
   const ctx = makeCtx(bs);
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.disrupted, true, 'disrupt effect should set bs.disrupted');
+  assert.equal(bs.player.outgoingHalved, true, 'disrupt effect should set player.outgoingHalved');
 });
 
-test('applyOpponentTurn: deferred move stores damage and returns null', () => {
+test('applyOpponentTurn: deferred move stores deferredIncoming and returns null', () => {
   engine.init();
   // scope_ambiguity: damage 20, effect 'deferred'
   const bs  = makeBattleState({ professorMoves: ['scope_ambiguity'] });
@@ -328,21 +327,21 @@ test('applyOpponentTurn: deferred move stores damage and returns null', () => {
   const result = applyOpponentTurn(ctx);
 
   assert.equal(result, null, 'deferred move should return null');
-  assert.equal(bs.deferredDamage, 20, 'deferredDamage should be set to the move damage');
+  assert.equal(bs.player.deferredIncoming, 20, 'player.deferredIncoming should be set to the move damage');
   assert.equal(engine.getState().playerHP, 100, 'player HP should not change immediately');
 });
 
-test('applyOpponentTurn: professorHalved flag halves professor damage and is cleared', () => {
+test('applyOpponentTurn: opponent.outgoingHalved flag halves damage and is cleared', () => {
   engine.init(); // playerHP = 100
   // minimal_pair: damage 18 → halved to 9
   const bs = makeBattleState({ professorMoves: ['minimal_pair'] });
-  bs.professorHalved = true;
+  bs.opponent.outgoingHalved = true;
   const ctx = makeCtx(bs);
 
   applyOpponentTurn(ctx);
 
-  assert.equal(engine.getState().playerHP, 91, 'professor damage should be halved (18 → 9)');
-  assert.equal(bs.professorHalved, false, 'professorHalved flag should be cleared after use');
+  assert.equal(engine.getState().playerHP, 91, 'opponent damage should be halved (18 → 9)');
+  assert.equal(bs.opponent.outgoingHalved, false, 'outgoingHalved flag should be cleared after use');
 });
 
 // ─── _setUIMode ───────────────────────────────────────────────────────────────
@@ -408,65 +407,66 @@ test('_setUIMode: log mode shows battleLogText, hides actionTexts, moveTexts, mo
 
 // ─── applyPlayerMove — new effects ───────────────────────────────────────────
 
-test('applyPlayerMove: playerSkipped causes player to skip and clears the flag', () => {
+test('applyPlayerMove: player.skippedTurns causes player to skip and decrements counter', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
-  bs.playerMoves       = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
-  bs.selectedMoveIndex = 0;
-  bs.playerSkipped     = true;
+  bs.playerMoves          = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
+  bs.selectedMoveIndex    = 0;
+  bs.player.skippedTurns  = 1;
   const ctx = makeCtx(bs);
 
   const result = applyPlayerMove(ctx);
 
   assert.equal(result, null, 'skipped player turn should return null');
-  assert.equal(bs.playerSkipped, false, 'playerSkipped should be cleared after use');
-  assert.equal(bs.professorHP, 100, 'no damage should be dealt when player is skipped');
+  assert.equal(bs.player.skippedTurns, 0, 'skippedTurns should decrement to 0');
+  assert.equal(bs.opponent.hp, 100, 'no damage should be dealt when player is skipped');
   assert.equal(ctx.seq.length, 1, 'should push exactly one text step');
 });
 
-test('applyPlayerMove: playerReducedNext10 reduces damage by 10 flat and clears the field', () => {
-  engine.init();
-  const bs = makeBattleState({ professorHP: 100 });
-  bs.playerMoves         = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
-  bs.selectedMoveIndex   = 0;
-  bs.playerReducedNext10 = 10;
-  const ctx = makeCtx(bs);
-
-  applyPlayerMove(ctx);
-
-  assert.equal(bs.professorHP, 88, 'playerReducedNext10 should reduce 22 to 12');
-  assert.equal(bs.playerReducedNext10, 0, 'playerReducedNext10 should be cleared after use');
-});
-
-test('applyPlayerMove: npcVulnTurns adds 5 damage to NPC and decrements counter', () => {
+test('applyPlayerMove: player.reducedNext reduces damage by 10 flat and clears the field', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
   bs.playerMoves       = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
   bs.selectedMoveIndex = 0;
-  bs.npcVulnTurns      = 2;
+  bs.player.reducedNext = 10;
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorHP, 75, 'npcVulnTurns should add 5 damage (22 + 5 = 27)');
-  assert.equal(bs.npcVulnTurns, 1, 'npcVulnTurns should decrement by 1');
+  assert.equal(bs.opponent.hp, 88, 'reducedNext should reduce 22 to 12');
+  assert.equal(bs.player.reducedNext, 0, 'reducedNext should be cleared after use');
 });
 
-test('applyPlayerMove: npcIncomingHalved halves final player damage and clears flag', () => {
+test('applyPlayerMove: opponent.vulnTurns adds vulnBonus damage and decrements counter', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
-  bs.playerMoves       = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
-  bs.selectedMoveIndex = 0;
-  bs.npcIncomingHalved = true;
+  bs.playerMoves          = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
+  bs.selectedMoveIndex    = 0;
+  bs.opponent.vulnTurns   = 2;
+  bs.opponent.vulnBonus   = 5;
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorHP, 89, 'npcIncomingHalved should halve 22 to 11');
-  assert.equal(bs.npcIncomingHalved, false, 'npcIncomingHalved should be cleared after use');
+  assert.equal(bs.opponent.hp, 75, 'vulnTurns should add 5 damage (22 + 5 = 27)');
+  assert.equal(bs.opponent.vulnTurns, 1, 'vulnTurns should decrement by 1');
 });
 
-test('applyPlayerMove: lastPlayerDamage is set to the actual damage dealt', () => {
+test('applyPlayerMove: opponent.incomingHalved halves final player damage and clears flag', () => {
+  engine.init();
+  const bs = makeBattleState({ professorHP: 100 });
+  bs.playerMoves             = [{ id: 'counterexample', name: 'Counterexample', damage: 22, effect: null }];
+  bs.selectedMoveIndex       = 0;
+  bs.opponent.incomingHalved = true;
+  const ctx = makeCtx(bs);
+
+  applyPlayerMove(ctx);
+
+  assert.equal(bs.opponent.hp, 89, 'incomingHalved should halve 22 to 11');
+  assert.equal(bs.opponent.incomingHalved, false, 'incomingHalved should be cleared after use');
+});
+
+test('applyPlayerMove: player.lastDamage is set to the actual damage dealt', () => {
   engine.init();
   const bs = makeBattleState({ professorHP: 100 });
   bs.playerMoves       = [{ id: 'counterexample', name: 'Counterexample', damage: 30, effect: null }];
@@ -475,132 +475,133 @@ test('applyPlayerMove: lastPlayerDamage is set to the actual damage dealt', () =
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.lastPlayerDamage, 30, 'lastPlayerDamage should record the damage dealt');
+  assert.equal(bs.player.lastDamage, 30, 'player.lastDamage should record the damage dealt');
 });
 
-// ─── applyOpponentTurn — new NPC effects ─────────────────────────────────────
+// ─── applyOpponentTurn — NPC effects ─────────────────────────────────────────
 
-test('applyOpponentTurn: npcSkippedTurns > 0 causes NPC to skip and decrements counter', () => {
+test('applyOpponentTurn: opponent.skippedTurns > 1 decrements counter without fainting', () => {
   engine.init();
   const bs = makeBattleState();
-  bs.npcSkippedTurns = 2;
+  bs.opponent.skippedTurns = 2;
   const ctx = makeCtx(bs);
 
   const result = applyOpponentTurn(ctx);
 
   assert.equal(result, null, 'skipped NPC turn should return null');
-  assert.equal(bs.npcSkippedTurns, 1, 'npcSkippedTurns should decrement by 1');
+  assert.equal(bs.opponent.skippedTurns, 1, 'skippedTurns should decrement by 1');
   assert.equal(engine.getState().playerHP, 100, 'player HP should not change during NPC skip');
   assert.equal(ctx.seq.length, 1, 'should push one text step');
 });
 
-test('applyOpponentTurn: skip_opponent effect sets playerSkipped', () => {
+test('applyOpponentTurn: skip_opponent effect sets player.skippedTurns', () => {
   engine.init();
   const bs = makeBattleState({ professorMoves: ['access_denied'], professorHP: 80 });
   const ctx = makeCtx(bs, 'student', 'student_rohan');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.playerSkipped, true, 'skip_opponent should set playerSkipped');
+  assert.equal(bs.player.skippedTurns, 1, 'skip_opponent should set player.skippedTurns to 1');
 });
 
-test('applyOpponentTurn: halve_next effect (NPC side) sets disrupted', () => {
+test('applyOpponentTurn: halve_next effect (NPC side) sets player.outgoingHalved', () => {
   engine.init();
   const bs  = makeBattleState({ professorMoves: ['non_sequitur'], professorHP: 80 });
   const ctx = makeCtx(bs, 'student', 'student_simon');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.disrupted, true, 'NPC halve_next should set bs.disrupted');
+  assert.equal(bs.player.outgoingHalved, true, 'NPC halve_next should set player.outgoingHalved');
 });
 
-test('applyOpponentTurn: heal effect restores NPC HP up to max', () => {
+test('applyOpponentTurn: heal effect restores NPC HP up to maxHP', () => {
   engine.init();
-  // office_hours: damage 0, effect 'heal', healAmount 25
+  // office_hours: damage 0, effect 'heal', healAmount 15
   const bs = makeBattleState({ professorMoves: ['office_hours'], professorHP: 60 });
-  bs.professor.hp = 80; // max HP for this NPC
+  bs.professor.hp      = 80; // max HP for this NPC
+  bs.opponent.maxHP    = 80;
   const ctx = makeCtx(bs, 'student', 'student_mina');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.professorHP, 80, 'heal should cap at max HP (60 + 25 capped at 80)');
+  assert.equal(bs.opponent.hp, 75, 'heal should restore 15 HP (60 + 15 = 75, within max 80)');
 });
 
-test('applyOpponentTurn: skip_self sets npcSkippedTurns to 1', () => {
+test('applyOpponentTurn: skip_self (skipTurns:1) sets opponent.skippedTurns to 1', () => {
   engine.init();
-  // lit_review_dump: damage 25, effect 'skip_self'
+  // lit_review_dump: damage 25, effect 'skip_self', skipTurns: 1
   const bs  = makeBattleState({ professorMoves: ['lit_review_dump'], professorHP: 80 });
   const ctx = makeCtx(bs, 'student', 'student_voss');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.npcSkippedTurns, 1, 'skip_self should set npcSkippedTurns to 1');
+  assert.equal(bs.opponent.skippedTurns, 1, 'skip_self (skipTurns:1) should set skippedTurns to 1');
 });
 
-test('applyOpponentTurn: skip_self_2 sets npcSkippedTurns to 2', () => {
+test('applyOpponentTurn: skip_self (skipTurns:2) sets opponent.skippedTurns to 2', () => {
   engine.init();
-  // burnout: damage 40, effect 'skip_self_2'
+  // burnout: damage 40, effect 'skip_self', skipTurns: 2
   const bs  = makeBattleState({ professorMoves: ['burnout'], professorHP: 80 });
   const ctx = makeCtx(bs, 'student', 'student_simon');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.npcSkippedTurns, 2, 'skip_self_2 should set npcSkippedTurns to 2');
+  assert.equal(bs.opponent.skippedTurns, 2, 'skip_self (skipTurns:2) should set skippedTurns to 2');
 });
 
-test('applyOpponentTurn: npcDoubledNext doubles NPC damage on the following turn', () => {
+test('applyOpponentTurn: outgoingDoubled doubles NPC damage on the following turn', () => {
   engine.init(); // playerHP = 100
   // counterexample: damage 22, effect null (in npcMoves pool)
   const bs = makeBattleState({ professorMoves: ['counterexample'], professorHP: 80 });
-  bs.npcDoubledNext = true;
+  bs.opponent.outgoingDoubled = true;
   const ctx = makeCtx(bs, 'student', 'student_elena');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(engine.getState().playerHP, 56, 'npcDoubledNext should double 22 to 44');
-  assert.equal(bs.npcDoubledNext, false, 'npcDoubledNext should be cleared after use');
+  assert.equal(engine.getState().playerHP, 56, 'outgoingDoubled should double 22 to 44');
+  assert.equal(bs.opponent.outgoingDoubled, false, 'outgoingDoubled should be cleared after use');
 });
 
-test('applyOpponentTurn: student self_damage deals flat 10 recoil (not 25%)', () => {
+test('applyOpponentTurn: student self_damage deals flat recoilAmount (not percent)', () => {
   engine.init();
-  // all_nighter: damage 38, effect 'self_damage'
+  // all_nighter: damage 38, effect 'self_damage', recoilAmount 10
   const bs  = makeBattleState({ professorMoves: ['all_nighter'], professorHP: 80 });
   const ctx = makeCtx(bs, 'student', 'student_simon');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.professorHP, 70, 'student self_damage should deal flat 10 recoil (80 - 10 = 70)');
+  assert.equal(bs.opponent.hp, 70, 'student self_damage should deal flat 10 recoil (80 - 10 = 70)');
 });
 
-test('applyOpponentTurn: mutual_damage_20 deals 20 to player and 20 to NPC', () => {
+test('applyOpponentTurn: chance_mutual_damage_30 uses mutualDamage as attack damage', () => {
   engine.init(); // playerHP = 100
-  // meaning_crisis: damage 0, effect 'mutual_damage_20'
+  // meaning_crisis: damage 30, mutualDamage 30, mutualChance 0.5
   const bs  = makeBattleState({ professorMoves: ['meaning_crisis'], professorHP: 80 });
   const ctx = makeCtx(bs, 'student', 'student_marcellus');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(engine.getState().playerHP, 80, 'mutual_damage_20 should deal 20 to player');
-  assert.equal(bs.professorHP, 60, 'mutual_damage_20 should deal 20 to NPC');
+  // Player always takes mutualDamage (30) as the attack cost; NPC recoil is stochastic
+  assert.equal(engine.getState().playerHP, 70, 'player should take mutualDamage (30) as attack');
 });
 
-test('applyOpponentTurn: conditional_damage deals 40 when lastPlayerDamage >= 30', () => {
+test('applyOpponentTurn: conditional_damage deals 40 when player.lastDamage >= 30', () => {
   engine.init();
   // correction: damage 20, effect 'conditional_damage'
   const bs = makeBattleState({ professorMoves: ['correction'], professorHP: 80 });
-  bs.lastPlayerDamage = 35;
+  bs.player.lastDamage = 35;
   const ctx = makeCtx(bs, 'student', 'student_voss');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(engine.getState().playerHP, 60, 'conditional_damage should deal 40 when lastPlayerDamage >= 30');
+  assert.equal(engine.getState().playerHP, 60, 'conditional_damage should deal 40 when player.lastDamage >= 30');
 });
 
-test('applyOpponentTurn: conditional_damage deals base damage when lastPlayerDamage < 30', () => {
+test('applyOpponentTurn: conditional_damage deals base damage when player.lastDamage < 30', () => {
   engine.init();
   // correction: damage 20, effect 'conditional_damage'
   const bs = makeBattleState({ professorMoves: ['correction'], professorHP: 80 });
-  bs.lastPlayerDamage = 15;
+  bs.player.lastDamage = 15;
   const ctx = makeCtx(bs, 'student', 'student_voss');
 
   applyOpponentTurn(ctx);
@@ -608,18 +609,18 @@ test('applyOpponentTurn: conditional_damage deals base damage when lastPlayerDam
   assert.equal(engine.getState().playerHP, 80, 'conditional_damage should deal base 20 when threshold not met');
 });
 
-test('applyOpponentTurn: clear_buffs clears disrupted and playerReducedNext10', () => {
+test('applyOpponentTurn: clear_buffs clears player.outgoingHalved and player.reducedNext', () => {
   engine.init();
   // undergrad_flashback: damage 14, effect 'clear_buffs'
   const bs = makeBattleState({ professorMoves: ['undergrad_flashback'], professorHP: 80 });
-  bs.disrupted           = true;
-  bs.playerReducedNext10 = 10;
+  bs.player.outgoingHalved = true;
+  bs.player.reducedNext    = 10;
   const ctx = makeCtx(bs, 'student', 'student_lab_sentinel_k');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.disrupted, false, 'clear_buffs should clear disrupted');
-  assert.equal(bs.playerReducedNext10, 0, 'clear_buffs should clear playerReducedNext10');
+  assert.equal(bs.player.outgoingHalved, false, 'clear_buffs should clear player.outgoingHalved');
+  assert.equal(bs.player.reducedNext, 0, 'clear_buffs should clear player.reducedNext');
 });
 
 // ─── damageBuff & defenseStat ────────────────────────────────────────────────
@@ -635,7 +636,7 @@ test('applyPlayerMove: damageBuff from engine state is added to base move damage
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorHP, 100 - (22 + damageBuff), 'damageBuff should be added to move damage');
+  assert.equal(bs.opponent.hp, 100 - (22 + damageBuff), 'damageBuff should be added to move damage');
 });
 
 test('applyPlayerMove: damageBuff of 0 does not alter base damage', () => {
@@ -647,7 +648,7 @@ test('applyPlayerMove: damageBuff of 0 does not alter base damage', () => {
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorHP, 78, 'zero damageBuff should leave damage unchanged at 22');
+  assert.equal(bs.opponent.hp, 78, 'zero damageBuff should leave damage unchanged at 22');
 });
 
 test('applyOpponentTurn: defenseStat from engine state reduces incoming damage', () => {
@@ -978,9 +979,6 @@ test('_endSeq: winning twice with the same moves does not duplicate learnedMoves
 });
 
 // ─── ALL_MOVE_MAP coverage (unified registry) ────────────────────────────────
-// ALL_MOVE_MAP is a module-level constant and not exported. These tests verify
-// the invariants it depends on: globally unique IDs across all three tables,
-// so merging is unambiguous and resolution is safe.
 
 test('move IDs are globally unique: no overlap between professorMoves and npcMoves', () => {
   const profIds = new Set(professorMoves.map(m => m.id));
@@ -1110,7 +1108,7 @@ test('_itemEffectMessage returns "EXP gain boosted!" for boost_exp', () => {
 
 // ─── reveal_next / priority / swap_effect (bidirectional) ────────────────────
 
-test('applyPlayerMove: reveal_next pre-rolls npcRevealedMove and shows text', () => {
+test('applyPlayerMove: reveal_next pre-rolls opponent.lockedMove and shows text', () => {
   engine.init();
   const bs = makeBattleState({ professorMoves: ['minimal_pair'] });
   bs.playerMoves = [{ id: 'dataset_leak', name: 'Dataset Leak', damage: 16, effect: 'reveal_next' }];
@@ -1119,11 +1117,11 @@ test('applyPlayerMove: reveal_next pre-rolls npcRevealedMove and shows text', ()
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.npcRevealedMove, 'minimal_pair', 'should store the pre-rolled NPC move id');
+  assert.equal(bs.opponent.lockedMove, 'minimal_pair', 'should store the pre-rolled NPC move id');
   assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes('Data leaked')), 'should show data leaked text');
 });
 
-test('applyPlayerMove: priority sets playerPriority flag', () => {
+test('applyPlayerMove: priority sets player.priority flag', () => {
   engine.init();
   const bs = makeBattleState();
   bs.playerMoves = [{ id: 'slack_message', name: 'Slack Message', damage: 10, effect: 'priority' }];
@@ -1132,55 +1130,55 @@ test('applyPlayerMove: priority sets playerPriority flag', () => {
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.playerPriority, true, 'should set playerPriority');
+  assert.equal(bs.player.priority, true, 'should set player.priority');
 });
 
-test('applyPlayerMove: swap_effect stores lastPlayerEffect as pendingPlayerSwappedEffect', () => {
+test('applyPlayerMove: swap_effect stores player.lastEffect as player.pendingSwapped', () => {
   engine.init();
   const bs = makeBattleState();
-  bs.lastPlayerEffect = 'skip';
+  bs.player.lastEffect = 'skip';
   bs.playerMoves = [{ id: 'methodology_pivot', name: 'Methodology Pivot', damage: 14, effect: 'swap_effect' }];
   bs.selectedMoveIndex = 0;
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.pendingPlayerSwappedEffect, 'skip', 'should store previous lastPlayerEffect');
+  assert.equal(bs.player.pendingSwapped, 'skip', 'should store previous lastEffect in pendingSwapped');
 });
 
-test('applyPlayerMove: playerLockedMove forces specific move regardless of selectedMoveIndex', () => {
+test('applyPlayerMove: player.lockedMove forces specific move regardless of selectedMoveIndex', () => {
   engine.init();
   const bs = makeBattleState();
   bs.playerMoves = [
     { id: 'peer_review',  name: 'Peer Review',  damage: 20, effect: null },
     { id: 'office_hours', name: 'Office Hours', damage: 15, effect: null },
   ];
-  bs.selectedMoveIndex = 0; // would normally use peer_review
-  bs.playerLockedMove  = 'office_hours';
+  bs.selectedMoveIndex  = 0; // would normally use peer_review
+  bs.player.lockedMove  = 'office_hours';
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.playerLockedMove, null, 'playerLockedMove should be cleared');
+  assert.equal(bs.player.lockedMove, null, 'player.lockedMove should be cleared');
   assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes('Office Hours')), 'should use the locked move');
   assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes("locked in")), 'should show locked-in message');
 });
 
-test('applyPlayerMove: pendingPlayerSwappedEffect fires after normal effect then clears', () => {
+test('applyPlayerMove: player.pendingSwapped fires after normal effect then clears', () => {
   engine.init();
   const bs = makeBattleState();
-  bs.pendingPlayerSwappedEffect = 'skip'; // skip = set professorSkipped
+  bs.player.pendingSwapped = 'skip'; // skip = stun opponent
   bs.playerMoves = [{ id: 'peer_review', name: 'Peer Review', damage: 20, effect: null }];
   bs.selectedMoveIndex = 0;
   const ctx = makeCtx(bs);
 
   applyPlayerMove(ctx);
 
-  assert.equal(bs.professorSkipped, true, 'pendingPlayerSwappedEffect (skip) should have fired');
-  assert.equal(bs.pendingPlayerSwappedEffect, null, 'pendingPlayerSwappedEffect should be cleared');
+  assert.equal(bs.opponent.skippedTurns, 1, 'pendingSwapped (skip) should have fired');
+  assert.equal(bs.player.pendingSwapped, null, 'pendingSwapped should be cleared');
 });
 
-test('applyOpponentTurn: reveal_next stores playerLockedMove from selected player move', () => {
+test('applyOpponentTurn: reveal_next stores player.lockedMove from selected player move', () => {
   engine.init();
   const bs = makeBattleState({ professorMoves: ['dataset_leak'] });
   bs.playerMoves = [{ id: 'peer_review', name: 'Peer Review', damage: 20, effect: null }];
@@ -1189,11 +1187,11 @@ test('applyOpponentTurn: reveal_next stores playerLockedMove from selected playe
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.playerLockedMove, 'peer_review', 'should lock the player into their selected move');
+  assert.equal(bs.player.lockedMove, 'peer_review', 'should lock the player into their selected move');
   assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes('locked into')), 'should show lock message');
 });
 
-test('applyOpponentTurn: priority sets npcPriority flag', () => {
+test('applyOpponentTurn: priority sets opponent.priority flag', () => {
   engine.init();
   const bs = makeBattleState({ professorMoves: ['slack_message'] });
   bs.playerMoves = [];
@@ -1201,43 +1199,43 @@ test('applyOpponentTurn: priority sets npcPriority flag', () => {
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.npcPriority, true, 'should set npcPriority');
+  assert.equal(bs.opponent.priority, true, 'should set opponent.priority');
 });
 
-test('applyOpponentTurn: swap_effect stores lastNpcEffect as pendingSwappedEffect', () => {
+test('applyOpponentTurn: swap_effect stores opponent.lastEffect as opponent.pendingSwapped', () => {
   engine.init();
   const bs = makeBattleState({ professorMoves: ['methodology_pivot'] });
-  bs.lastNpcEffect = 'disrupt';
+  bs.opponent.lastEffect = 'disrupt';
   bs.playerMoves = [];
   const ctx = makeCtx(bs, 'student');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.pendingSwappedEffect, 'disrupt', 'should store previous lastNpcEffect');
+  assert.equal(bs.opponent.pendingSwapped, 'disrupt', 'should store previous lastEffect in pendingSwapped');
 });
 
-test('applyOpponentTurn: npcRevealedMove used instead of random, then cleared', () => {
+test('applyOpponentTurn: opponent.lockedMove used instead of random, then cleared', () => {
   engine.init();
   const bs = makeBattleState({ professorMoves: ['dataset_leak', 'conference_talk', 'whiteboard_spiral'] });
-  bs.npcRevealedMove = 'conference_talk';
+  bs.opponent.lockedMove = 'conference_talk';
   bs.playerMoves = [];
   const ctx = makeCtx(bs, 'student');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.npcRevealedMove, null, 'npcRevealedMove should be cleared after use');
-  assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes('Conference Talk')), 'should use the revealed move');
+  assert.equal(bs.opponent.lockedMove, null, 'opponent.lockedMove should be cleared after use');
+  assert.ok(ctx.seq.some(s => s.type === 'text' && s.msg.includes('Conference Talk')), 'should use the locked move');
 });
 
-test('applyOpponentTurn: pendingSwappedEffect fires after normal effect then clears', () => {
+test('applyOpponentTurn: opponent.pendingSwapped fires after normal effect then clears', () => {
   engine.init();
-  const bs = makeBattleState({ professorMoves: ['citation_needed'] }); // citation_needed: damage 0, nullify_last_buff
-  bs.pendingSwappedEffect = 'disrupt'; // disrupt sets bs.disrupted = true
+  const bs = makeBattleState({ professorMoves: ['citation_needed'] }); // nullify_last_buff
+  bs.opponent.pendingSwapped = 'disrupt'; // disrupt sets player.outgoingHalved = true
   bs.playerMoves = [];
   const ctx = makeCtx(bs, 'student');
 
   applyOpponentTurn(ctx);
 
-  assert.equal(bs.disrupted, true, 'pendingSwappedEffect (disrupt) should have fired');
-  assert.equal(bs.pendingSwappedEffect, null, 'pendingSwappedEffect should be cleared');
+  assert.equal(bs.player.outgoingHalved, true, 'pendingSwapped (disrupt) should have fired');
+  assert.equal(bs.opponent.pendingSwapped, null, 'pendingSwapped should be cleared');
 });

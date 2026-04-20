@@ -5,12 +5,26 @@
 //
 // ctx shape:
 //   bs           — battleState reference (mutated in place)
-//   seq          — ordered visual steps array (populated by text/animP/animPl)
+//   seq          — ordered visual steps array
 //   text(msg)    — pushes a text-line step onto seq
 //   animP(f,t)   — pushes a professor HP animation step onto seq
 //   animPl(f,t)  — pushes a player HP animation step onto seq
 //   opponentType — 'professor' | 'student'
 //   opponentId   — opponent identifier; used when calling engine.defeatProfessor on win
+//
+// Symmetric entity model
+// ──────────────────────
+// bs.player and bs.opponent both conform to the same interface:
+//   hp, maxHP, name,
+//   skippedTurns, outgoingHalved, outgoingDoubled, outgoingBonus,
+//   boostedTurns, boostedAmount, vulnTurns, vulnBonus,
+//   incomingHalved, reducedNext, priority,
+//   lastDamage, lastEffect, pendingSwapped, deferredIncoming, lockedMove
+//
+// applyPlayerMove binds self=player / target=opponent before dispatching.
+// applyOpponentTurn binds self=opponent / target=player before dispatching.
+// A single `effects` map handles both sides; each handler uses self/target.
+// After each resolver call, engine.setPlayerHP(bs.player.hp) is called once.
 
 import * as engine from '../../engine.js';
 import { professorMoves, npcMoves } from '../../data/moves.js';
@@ -18,479 +32,391 @@ import { professorMoves, npcMoves } from '../../data/moves.js';
 const PROF_MOVE_MAP = Object.fromEntries(professorMoves.map(m => [m.id, m]));
 const NPC_MOVE_MAP  = Object.fromEntries(npcMoves.map(m => [m.id, m]));
 
-// ── Player effect handlers ────────────────────────────────────────────────────
-// Called after base damage is applied to the opponent.
-// Each handler receives an extended ctx (includes `move`) and may return 'loss'
-// if the player faints from a side effect. Returning nothing means the turn continues.
+// ── Unified effects map ───────────────────────────────────────────────────────
+// Effect handlers receive an extended ctx that adds:
+//   self, target      — entity references swapped by the caller
+//   animSelf, animTarget — HP bar animation callbacks for self / target
+//   selfFaintResult   — 'loss'|'win' returned when self faints
+//   targetFaintResult — 'win'|'loss' returned when target faints mid-handler
+//   actingSide        — 'player'|'opponent' (for the few effects that are asymmetric)
+//   move              — the move being used
 
-const playerEffects = {
-  skip({ bs, text }) {
-    bs.professorSkipped = true;
-    text(`${bs.professor.name} is stunned — skips their next turn.`);
+const effects = {
+
+  // ── Stun / skip target ────────────────────────────────────────────────────
+  skip({ target, text }) {
+    target.skippedTurns = Math.max(target.skippedTurns, 1);
+    text(`${target.name} is stunned — skips their next turn.`);
   },
-  skip_opponent({ bs, text }) {
-    bs.professorSkipped = true;
-    text(`${bs.professor.name} is stunned — skips their next turn.`);
+  skip_opponent({ target, text }) {
+    target.skippedTurns = Math.max(target.skippedTurns, 1);
+    text(`${target.name} is stunned — skips their next turn.`);
   },
-  disrupt({ bs, text }) {
-    bs.professorSkipped = true;
-    text(`${bs.professor.name} is thrown off — skips their next turn.`);
+  disrupt({ target, text }) {
+    target.outgoingHalved = true;
+    text(`${target.name}'s next move will deal half damage.`);
   },
-  chance_skip_opponent({ bs, text, move }) {
+  halve_next({ target, text }) {
+    target.outgoingHalved = true;
+    text(`${target.name}'s next move will deal half damage.`);
+  },
+  chance_skip_opponent({ target, text, move }) {
     if (Math.random() < (move.skipChance ?? 0.5)) {
-      bs.professorSkipped = true;
-      text(`${bs.professor.name} is stunned — skips their next turn.`);
+      target.skippedTurns = Math.max(target.skippedTurns, 1);
+      text(`${target.name} is stunned — skips their next turn.`);
     }
   },
-  player_recoil({ text, animPl, move }) {
-    const recoil = move.recoilAmount ?? 10;
-    const from   = engine.getState().playerHP;
-    const newHP  = from - recoil;
-    engine.setPlayerHP(newHP);
-    text(`You take ${recoil} recoil damage.`);
-    animPl(from, Math.max(0, newHP));
-    if (newHP <= 0) {
-      text('You fainted from recoil!');
-      return 'loss';
-    }
-  },
-  self_damage({ text, animPl, move }) {
-    const recoil = move.recoilAmount ?? 10;
-    const from   = engine.getState().playerHP;
-    const newHP  = from - recoil;
-    engine.setPlayerHP(newHP);
-    text(`You take ${recoil} recoil damage.`);
-    animPl(from, Math.max(0, newHP));
-    if (newHP <= 0) {
-      text('You fainted from recoil!');
-      return 'loss';
-    }
-  },
-  heal({ text, animPl, move }) {
-    const healAmt = move.healAmount ?? 10;
-    const fromHP  = engine.getState().playerHP;
-    engine.setPlayerHP(fromHP + healAmt);
-    const healed  = engine.getState().playerHP - fromHP;
-    text(`You recover ${healed} HP.`);
-    animPl(fromHP, engine.getState().playerHP);
-  },
-  halve_next({ bs, text }) {
-    bs.professorHalved = true;
-    text(`${bs.professor.name}'s next move will deal half damage.`);
-  },
-  chance_halve_opponent({ bs, text, move }) {
+  chance_halve_opponent({ target, text, move }) {
     if (Math.random() < (move.halveChance ?? 0.25)) {
-      bs.professorHalved = true;
-      text(`${bs.professor.name}'s next move will deal half damage.`);
+      target.outgoingHalved = true;
+      text(`${target.name}'s next move will deal half damage.`);
     }
   },
-  clear_debuff({ bs, text }) {
-    bs.disrupted = false;
+
+  // ── Self-targeting effects ────────────────────────────────────────────────
+  self_damage({ self, text, animSelf, move, selfFaintResult, opponentType, opponentId }) {
+    const recoil = move.recoilPercent
+      ? Math.floor(move.damage * move.recoilPercent)
+      : (move.recoilAmount ?? 10);
+    const fromHP = self.hp;
+    self.hp = Math.max(0, self.hp - recoil);
+    text(`${self.name} takes ${recoil} recoil damage.`);
+    animSelf(fromHP, self.hp);
+    if (self.hp <= 0) {
+      if (selfFaintResult === 'win' && opponentType === 'professor') engine.defeatProfessor(opponentId);
+      text(`${self.name} faints from recoil!`);
+      return selfFaintResult;
+    }
+  },
+  heal({ self, text, animSelf, move }) {
+    const oldHP = self.hp;
+    self.hp = Math.min(self.maxHP, self.hp + (move.healAmount ?? 10));
+    const gained = self.hp - oldHP;
+    text(`${self.name} recovers ${gained} HP.`);
+    animSelf(oldHP, self.hp);
+  },
+  halve_self_next({ self }) {
+    self.outgoingHalved = true;
+  },
+  double_next({ self, text }) {
+    self.outgoingDoubled = true;
+    text(`${self.name} charges up for a powerful next move!`);
+  },
+  skip_self({ self, move }) {
+    self.skippedTurns = Math.max(self.skippedTurns, move.skipTurns ?? 1);
+  },
+  self_vuln({ self, move }) {
+    self.vulnTurns = Math.max(self.vulnTurns, move.vulnTurns ?? 1);
+    self.vulnBonus = move.vulnBonus ?? 5;
+  },
+  chance_boost_next({ self, move }) {
+    if (Math.random() < (move.boostChance ?? 0.5)) self.outgoingBonus += (move.boostAmount ?? 10);
+  },
+  boost_sustained({ self, text, move }) {
+    self.boostedTurns  = move.boostTurns  ?? 2;
+    self.boostedAmount = move.boostAmount ?? 20;
+    text(`${self.name} enters a flow state!`);
+  },
+
+  // ── Debuff / buff manipulation ────────────────────────────────────────────
+  clear_debuff({ self, text }) {
+    self.outgoingHalved = false;
     text('Disruption effect cleared!');
   },
-  chance_mutual_damage_30({ text, animPl, move }) {
-    if (Math.random() < (move.mutualChance ?? 0.5)) {
-      const mutualDmg = move.mutualDamage ?? 30;
-      const from      = engine.getState().playerHP;
-      const newHP     = from - mutualDmg;
-      engine.setPlayerHP(newHP);
-      text(`You take ${mutualDmg} damage from the mutual exchange.`);
-      animPl(from, Math.max(0, newHP));
-      if (newHP <= 0) {
-        text('You fainted!');
-        return 'loss';
-      }
-    }
+  clear_buffs({ target, text }) {
+    target.outgoingHalved = false;
+    target.reducedNext    = 0;
+    text(`${target.name}'s buffs are stripped away.`);
   },
-  reveal_next({ bs, text, opponentType }) {
-    const moveMap = opponentType === 'student' ? NPC_MOVE_MAP : PROF_MOVE_MAP;
-    const moveIds = bs.professor.moves;
-    const nextId  = moveIds[Math.floor(Math.random() * moveIds.length)];
-    bs.npcRevealedMove = nextId;
-    text(`Data leaked! ${bs.professor.name} will use ${moveMap[nextId].name} next turn.`);
+  nullify_last_buff({ target, text }) {
+    target.outgoingHalved = false;
+    text(`${target.name}'s last buff is nullified!`);
   },
-  priority({ bs, text }) {
-    bs.playerPriority = true;
-    text("You queue a priority message — you'll act first next turn!");
+  reduce_next_10({ target, text, move }) {
+    target.reducedNext += (move.reduceAmount ?? 10);
+    text(`${target.name}'s next move is weakened.`);
   },
-  swap_effect({ bs, text }) {
-    bs.pendingPlayerSwappedEffect = bs.lastPlayerEffect;
-    if (bs.lastPlayerEffect) {
-      text('You pivot your methodology — your previous technique will echo next turn!');
-    } else {
-      text('You pivot, but have no prior technique to echo.');
-    }
+  heal_and_reduce_next({ self, target, text, animSelf, move }) {
+    const oldHP = self.hp;
+    self.hp = Math.min(self.maxHP, self.hp + (move.healAmount ?? 0));
+    const gained = self.hp - oldHP;
+    target.reducedNext += (move.reduceAmount ?? 10);
+    text(`${self.name} recovers ${gained} HP. ${target.name}'s next move is weakened.`);
+    animSelf(oldHP, self.hp);
   },
-  // These effects modify damage before it's applied; no post-damage action needed.
-  counter:            null,
-  conditional_damage: null,
-  chance_fail:        null,
-  chance_bonus_10:    null,
-};
+  heal_and_shield({ self, text, animSelf, move }) {
+    const oldHP = self.hp;
+    self.hp = Math.min(self.maxHP, self.hp + (move.healAmount ?? 0));
+    const gained = self.hp - oldHP;
+    self.incomingHalved = true;
+    text(`${self.name} recovers ${gained} HP and braces for impact.`);
+    animSelf(oldHP, self.hp);
+  },
 
-// ── Opponent effect handlers ──────────────────────────────────────────────────
-// Called after base damage is applied to the player.
-// Each handler receives an extended ctx (includes `move`) and may return 'win' if
-// the opponent faints from a side effect, or 'loss' if a chain hit kills the player.
-
-const opponentEffects = {
-  disrupt({ bs, text }) {
-    bs.disrupted = true;
-    text('Your next move will deal half damage!');
-  },
-  self_damage({ bs, text, animP, move, opponentType, opponentId }) {
-    // Professor: 25% of original move damage. Student NPC: move.recoilAmount or flat 10.
-    const recoil   = opponentType === 'student' ? (move.recoilAmount ?? 10) : Math.floor(move.damage * 0.25);
-    const fromPH   = bs.professorHP;
-    bs.professorHP = Math.max(0, bs.professorHP - recoil);
-    text(`${bs.professor.name} takes ${recoil} recoil damage.`);
-    animP(fromPH, bs.professorHP);
-    if (bs.professorHP <= 0) {
-      if (opponentType === 'professor') engine.defeatProfessor(opponentId);
-      text(`${bs.professor.name} faints from recoil!`);
-      return 'win';
-    }
-  },
-  skip_opponent({ bs, text }) {
-    bs.playerSkipped = true;
-    text("You are disrupted — you'll skip your next action!");
-  },
-  chance_skip_opponent({ bs, text, move }) {
-    if (Math.random() < (move.skipChance ?? 0.5)) {
-      bs.playerSkipped = true;
-      text("You are disrupted — you'll skip your next action!");
-    } else {
-      text('The disruption attempt failed.');
-    }
-  },
-  // From the NPC's perspective, halve_next halves the player's next move.
-  halve_next({ bs, text }) {
-    bs.disrupted = true;
-    text('Your next move will deal half damage!');
-  },
-  chance_halve_opponent({ bs, text, move }) {
-    if (Math.random() < (move.halveChance ?? 0.25)) {
-      bs.disrupted = true;
-      text('Your next move will deal half damage!');
-    }
-  },
-  conditional_damage() {
-    // Damage modification handled pre-damage in applyOpponentTurn; no post-damage state.
-  },
-  clear_debuff({ bs, text }) {
-    bs.npcHalvedNext  = false;
-    bs.npcDoubledNext = false;
-    text(`${bs.professor.name} clears their debuffs.`);
-  },
-  heal({ bs, text, animP, move }) {
-    const healAmt  = move.healAmount ?? 0;
-    const oldHP    = bs.professorHP;
-    bs.professorHP = Math.min(bs.professor.hp, bs.professorHP + healAmt);
-    const gained   = bs.professorHP - oldHP;
-    text(`${bs.professor.name} recovers ${gained} HP.`);
-    animP(oldHP, bs.professorHP);
-  },
-  heal_and_reduce_next({ bs, text, animP, move }) {
-    const healAmt  = move.healAmount ?? 0;
-    const oldHP    = bs.professorHP;
-    bs.professorHP = Math.min(bs.professor.hp, bs.professorHP + healAmt);
-    const gained   = bs.professorHP - oldHP;
-    bs.playerReducedNext10 += (move.reduceAmount ?? 10);
-    text(`${bs.professor.name} recovers ${gained} HP. Your next move is weakened.`);
-    animP(oldHP, bs.professorHP);
-  },
-  heal_and_shield({ bs, text, animP, move }) {
-    const healAmt  = move.healAmount ?? 0;
-    const oldHP    = bs.professorHP;
-    bs.professorHP = Math.min(bs.professor.hp, bs.professorHP + healAmt);
-    const gained   = bs.professorHP - oldHP;
-    bs.npcIncomingHalved = true;
-    text(`${bs.professor.name} recovers ${gained} HP and braces for impact.`);
-    animP(oldHP, bs.professorHP);
-  },
-  reduce_next_10({ bs, text, move }) {
-    bs.playerReducedNext10 += (move.reduceAmount ?? 10);
-    text('Your next move is weakened.');
-  },
-  self_vuln_next({ bs }) {
-    bs.npcVulnTurns = Math.max(bs.npcVulnTurns, 1);
-  },
-  self_vuln_2({ bs }) {
-    bs.npcVulnTurns = Math.max(bs.npcVulnTurns, 2);
-  },
-  double_next({ bs, text }) {
-    bs.npcDoubledNext = true;
-    text(`${bs.professor.name} charges up for a powerful next move!`);
-  },
-  skip_self({ bs }) {
-    bs.npcSkippedTurns = Math.max(bs.npcSkippedTurns, 1);
-  },
-  skip_self_2({ bs }) {
-    bs.npcSkippedTurns = Math.max(bs.npcSkippedTurns, 2);
-  },
-  halve_self_next({ bs }) {
-    bs.npcHalvedNext = true;
-  },
-  clear_buffs({ bs, text }) {
-    bs.disrupted           = false;
-    bs.playerReducedNext10 = 0;
-    text('Your buffs are stripped away.');
-  },
-  nullify_last_buff({ bs, text }) {
-    bs.disrupted = false;
-    text('Your last buff is nullified!');
-  },
-  chance_boost_next_10({ bs, move }) {
-    if (Math.random() < (move.boostChance ?? 0.5)) bs.npcBoostNext10 = true;
-  },
-  boost_next_2({ bs, text }) {
-    bs.npcBoostedTurns = 2;
-    text(`${bs.professor.name} enters a flow state!`);
-  },
-  chance_fail() {
-    // Roll handled pre-damage in applyOpponentTurn; no post-damage state.
-  },
-  chance_bonus_10() {
-    // Roll handled pre-damage in applyOpponentTurn; no post-damage state.
-  },
-  chance_mutual_damage_30({ bs, text, animP, opponentType, opponentId, move }) {
-    const mutualDmg = move.mutualDamage ?? 30;
-    const fromPH2   = bs.professorHP;
-    bs.professorHP  = Math.max(0, bs.professorHP - mutualDmg);
-    text(`${bs.professor.name} also takes ${mutualDmg} damage!`);
-    animP(fromPH2, bs.professorHP);
-    if (bs.professorHP <= 0) {
-      if (opponentType === 'professor') engine.defeatProfessor(opponentId);
-      text(`${bs.professor.name} faints!`);
-      return 'win';
-    }
-  },
-  chain_hit_3({ bs, text, animPl, move }) {
-    // First hit already applied in applyOpponentTurn. Each extra hit has chainHitChance (max maxChainHits - 1).
+  // ── Multi-hit ─────────────────────────────────────────────────────────────
+  chain_hit({ target, text, animTarget, move, targetFaintResult }) {
     let extraHits = 0;
     const maxExtra  = (move.maxChainHits ?? 3) - 1;
     const hitChance = move.chainHitChance ?? 0.5;
     while (extraHits < maxExtra && Math.random() < hitChance) {
-      const fromPH3 = engine.getState().playerHP;
-      const toPH3   = fromPH3 - move.damage;
-      engine.setPlayerHP(toPH3);
-      bs.lastProfessorDamage += move.damage;
-      animPl(fromPH3, Math.max(0, toPH3));
+      const fromHP = target.hp;
+      target.hp = Math.max(0, target.hp - move.damage);
+      animTarget(fromHP, target.hp);
       extraHits++;
-      if (toPH3 <= 0) {
-        text(`Hit ${extraHits + 1} — you fainted!`);
-        return 'loss';
+      if (target.hp <= 0) {
+        text(`Hit ${extraHits + 1} — ${target.name} fainted!`);
+        return targetFaintResult;
       }
     }
     if (extraHits > 0) text(`Hit ${extraHits + 1} times!`);
   },
-  reveal_next({ bs, text }) {
-    const usedMove = bs.playerMoves[bs.selectedMoveIndex];
-    bs.playerLockedMove = usedMove.id;
-    text(`${bs.professor.name} reads your approach — you'll be locked into ${usedMove.name} next turn!`);
-  },
-  priority({ bs, text }) {
-    bs.npcPriority = true;
-    text(`${bs.professor.name} queues a priority message — they'll act first next turn!`);
-  },
-  swap_effect({ bs, text }) {
-    bs.pendingSwappedEffect = bs.lastNpcEffect;
-    if (bs.lastNpcEffect) {
-      text(`${bs.professor.name} pivots their methodology — their previous technique will echo next turn!`);
-    } else {
-      text(`${bs.professor.name} pivots, but has nothing to echo.`);
+
+  // ── Mutual damage ─────────────────────────────────────────────────────────
+  // Both sides take damage. self pays the cost with move.mutualChance probability.
+  chance_mutual_damage_30({ self, text, animSelf, move, selfFaintResult, opponentType, opponentId }) {
+    if (Math.random() < (move.mutualChance ?? 0.5)) {
+      const mutualDmg = move.mutualDamage ?? 30;
+      const fromHP = self.hp;
+      self.hp = Math.max(0, self.hp - mutualDmg);
+      text(`${self.name} also takes ${mutualDmg} damage!`);
+      animSelf(fromHP, self.hp);
+      if (self.hp <= 0) {
+        if (selfFaintResult === 'win' && opponentType === 'professor') engine.defeatProfessor(opponentId);
+        text(`${self.name} faints!`);
+        return selfFaintResult;
+      }
     }
   },
+
+  // ── Move prediction / lock-in ─────────────────────────────────────────────
+  // Asymmetric by design: player reveals opponent's random next move;
+  // opponent reads the player's currently selected move.
+  reveal_next({ self, target, text, bs, actingSide, opponentType }) {
+    if (actingSide === 'player') {
+      const moveMap = opponentType === 'student' ? NPC_MOVE_MAP : PROF_MOVE_MAP;
+      const moveIds = bs.professor.moves;
+      const nextId  = moveIds[Math.floor(Math.random() * moveIds.length)];
+      target.lockedMove = nextId;
+      text(`Data leaked! ${target.name} will use ${moveMap[nextId].name} next turn.`);
+    } else {
+      const usedMove = bs.playerMoves[bs.selectedMoveIndex];
+      target.lockedMove = usedMove.id;
+      text(`${self.name} reads your approach — you'll be locked into ${usedMove.name} next turn!`);
+    }
+  },
+  priority({ self, text }) {
+    self.priority = true;
+    text(`${self.name} queues priority — acts first next turn!`);
+  },
+  swap_effect({ self, text }) {
+    self.pendingSwapped = self.lastEffect;
+    if (self.lastEffect) {
+      text(`${self.name} pivots — previous technique echoes next turn!`);
+    } else {
+      text(`${self.name} pivots, but has nothing to echo.`);
+    }
+  },
+
+  // ── Pre-damage modifiers (resolved before the main damage step) ───────────
+  counter:            null,
+  conditional_damage: null,
+  chance_fail:        null,
+  chance_bonus_10:    null,
+  deferred:           null,
 };
 
 // ── Exported functions ────────────────────────────────────────────────────────
 
-// Applies any damage deferred from the previous professor turn.
-// Pushes a text line and player HP animation to ctx.seq.
-// Returns true if the player faints (loss condition); false otherwise.
+// Applies any damage deferred from the previous opponent turn.
+// Returns true if the player faints; false otherwise.
 export function applyDeferredDamage(ctx) {
   const { bs, text, animPl } = ctx;
-  if (bs.deferredDamage <= 0) return false;
+  const player = bs.player;
 
-  const dmg  = bs.deferredDamage;
-  bs.deferredDamage = 0;
-  const fromHP = engine.getState().playerHP;
-  const toHP   = fromHP - dmg;
-  engine.setPlayerHP(toHP);
-  bs.lastProfessorDamage = dmg;
+  // Sync from engine in case an item was used between turns.
+  player.hp = engine.getState().playerHP;
+
+  if (player.deferredIncoming <= 0) return false;
+
+  const dmg = player.deferredIncoming;
+  player.deferredIncoming = 0;
+  const fromHP = player.hp;
+  player.hp = Math.max(0, player.hp - dmg);
+  bs.opponent.lastDamage = dmg;
   text(`The deferred effect hits! You take ${dmg} damage.`);
-  animPl(fromHP, Math.max(0, toHP));
+  animPl(fromHP, player.hp);
+  engine.setPlayerHP(player.hp);
 
-  return toHP <= 0;
+  return player.hp <= 0;
 }
 
-// Applies the player's selected move: calculates damage, mutates professorHP,
-// and dispatches the move's effect via playerEffects.
-// Returns 'win' if the opponent is defeated, 'loss' if a side effect kills the player,
-// or null if the turn continues.
+// Applies the player's selected move.
+// Returns 'win', 'loss', or null.
 export function applyPlayerMove(ctx) {
-  const { bs, text, animP, opponentType, opponentId } = ctx;
+  const { bs, text, animP, animPl, opponentType, opponentId } = ctx;
+  const player   = bs.player;
+  const opponent = bs.opponent;
 
-  if (bs.playerSkipped) {
-    bs.playerSkipped = false;
+  // Sync from engine in case an item was used between turns.
+  player.hp = engine.getState().playerHP;
+
+  if (player.skippedTurns > 0) {
+    player.skippedTurns--;
     text('You are disrupted and skip your action!');
     return null;
   }
 
-  const lockedId = bs.playerLockedMove;
-  if (lockedId) bs.playerLockedMove = null;
+  const lockedId = player.lockedMove;
+  if (lockedId) player.lockedMove = null;
   const move = lockedId
     ? (bs.playerMoves.find(m => m.id === lockedId) ?? bs.playerMoves[bs.selectedMoveIndex])
     : bs.playerMoves[bs.selectedMoveIndex];
   if (lockedId) text(`You're locked in — forced to use ${move.name}!`);
 
-  // 'counter' / 'conditional_damage': deal 40 if the opponent's last move dealt ≥ 30.
-  let playerDamage = (move.effect === 'counter' || move.effect === 'conditional_damage') && bs.lastProfessorDamage >= 30
+  // counter / conditional_damage: deal 40 if opponent's last move dealt ≥ 30.
+  let dmg = (move.effect === 'counter' || move.effect === 'conditional_damage') && opponent.lastDamage >= 30
     ? 40
     : move.damage;
 
-  playerDamage += engine.getState().damageBuff;
+  dmg += engine.getState().damageBuff;
 
-  if (bs.playerReducedNext10 > 0) {
-    playerDamage = Math.max(0, playerDamage - bs.playerReducedNext10);
-    bs.playerReducedNext10 = 0;
-  }
+  if (player.reducedNext > 0)  { dmg = Math.max(0, dmg - player.reducedNext); player.reducedNext = 0; }
+  if (player.outgoingHalved)   { dmg = Math.floor(dmg / 2); player.outgoingHalved = false; }
+  if (player.outgoingDoubled)  { dmg *= 2; player.outgoingDoubled = false; }
+  if (player.outgoingBonus > 0){ dmg += player.outgoingBonus; player.outgoingBonus = 0; }
+  if (player.boostedTurns > 0) { dmg += player.boostedAmount; player.boostedTurns--; }
 
-  if (bs.disrupted) {
-    playerDamage = Math.floor(playerDamage / 2);
-    bs.disrupted = false;
-  }
+  player.lastDamage = dmg;
 
-  bs.lastPlayerDamage = playerDamage;
+  if (opponent.vulnTurns > 0)   { dmg += opponent.vulnBonus; opponent.vulnTurns--; }
+  if (opponent.incomingHalved)  { dmg = Math.floor(dmg / 2); opponent.incomingHalved = false; }
+  if (move.effect === 'chance_fail'     && Math.random() < (move.failureChance ?? 0.2)) dmg = 0;
+  if (move.effect === 'chance_bonus_10' && Math.random() < (move.bonusChance ?? 0.3)) dmg += (move.bonusAmount ?? 10);
 
-  if (bs.npcVulnTurns > 0) {
-    playerDamage += 5;
-    bs.npcVulnTurns--;
-  }
+  const fromOppHP = opponent.hp;
+  opponent.hp = Math.max(0, opponent.hp - dmg);
+  text(`You use ${move.name}! Deals ${dmg} damage.`);
+  animP(fromOppHP, opponent.hp);
 
-  if (bs.npcIncomingHalved) {
-    playerDamage = Math.floor(playerDamage / 2);
-    bs.npcIncomingHalved = false;
-  }
+  const extCtx = {
+    ...ctx, move,
+    self: player, target: opponent,
+    animSelf: animPl, animTarget: animP,
+    selfFaintResult: 'loss', targetFaintResult: 'win',
+    actingSide: 'player',
+  };
 
-  if (move.effect === 'chance_fail'     && Math.random() < (move.failureChance ?? 0.2))   playerDamage = 0;
-  if (move.effect === 'chance_bonus_10' && Math.random() < (move.bonusChance ?? 0.3)) playerDamage += (move.bonusAmount ?? 10);
-
-  const fromProfHP = bs.professorHP;
-  bs.professorHP   = Math.max(0, bs.professorHP - playerDamage);
-  text(`You use ${move.name}! Deals ${playerDamage} damage.`);
-  animP(fromProfHP, bs.professorHP);
-
-  const handler = playerEffects[move.effect];
+  const handler = effects[move.effect];
   if (handler) {
-    const result = handler({ ...ctx, move });
-    if (result) return result;
+    const result = handler(extCtx);
+    if (result) { engine.setPlayerHP(player.hp); return result; }
   }
 
-  if (bs.pendingPlayerSwappedEffect && bs.pendingPlayerSwappedEffect !== 'swap_effect') {
-    const swapHandler = playerEffects[bs.pendingPlayerSwappedEffect];
+  if (player.pendingSwapped && player.pendingSwapped !== 'swap_effect') {
+    const swapHandler = effects[player.pendingSwapped];
     if (swapHandler) {
-      const swapResult = swapHandler({ ...ctx, move });
-      if (swapResult) { bs.pendingPlayerSwappedEffect = null; return swapResult; }
+      const swapResult = swapHandler(extCtx);
+      if (swapResult) { player.pendingSwapped = null; engine.setPlayerHP(player.hp); return swapResult; }
     }
-    bs.pendingPlayerSwappedEffect = null;
+    player.pendingSwapped = null;
   }
-  bs.lastPlayerEffect = move.effect;
+  player.lastEffect = move.effect;
 
-  if (bs.professorHP <= 0) {
+  if (opponent.hp <= 0) {
     if (opponentType === 'professor') engine.defeatProfessor(opponentId);
-    text(`${bs.professor.name} is defeated!`);
+    text(`${opponent.name} is defeated!`);
+    engine.setPlayerHP(player.hp);
     return 'win';
   }
 
+  engine.setPlayerHP(player.hp);
   return null;
 }
 
-// Applies the opponent's turn: picks a random move and resolves its effect via
-// opponentEffects. Works for both professors (PROF_MOVE_MAP) and student NPCs (NPC_MOVE_MAP).
-// Returns 'loss' if the player faints, 'win' if the opponent faints from a side effect,
-// or null if the turn continues normally.
+// Applies the opponent's turn.
+// Returns 'loss', 'win', or null.
 export function applyOpponentTurn(ctx) {
-  const { bs, text, animPl, opponentType } = ctx;
+  const { bs, text, animP, animPl, opponentType } = ctx;
+  const opponent = bs.opponent;
+  const player   = bs.player;
 
-  if (bs.npcSkippedTurns > 0) {
-    bs.npcSkippedTurns--;
-    text(`${bs.professor.name} is exhausted and does nothing.`);
-    return null;
-  }
+  // Sync from engine in case an item was used between turns.
+  player.hp = engine.getState().playerHP;
 
-  if (bs.professorSkipped) {
-    bs.professorSkipped = false;
-    text(`${bs.professor.name} is stunned and does nothing.`);
+  if (opponent.skippedTurns > 0) {
+    opponent.skippedTurns--;
+    text(`${opponent.name} is unable to act this turn.`);
     return null;
   }
 
   const moveMap   = opponentType === 'student' ? NPC_MOVE_MAP : PROF_MOVE_MAP;
   const moveIds   = bs.professor.moves;
-  const oppMoveId = bs.npcRevealedMove ?? moveIds[Math.floor(Math.random() * moveIds.length)];
-  bs.npcRevealedMove = null;
-  const oppMove   = moveMap[oppMoveId];
+  const oppMoveId = opponent.lockedMove ?? moveIds[Math.floor(Math.random() * moveIds.length)];
+  opponent.lockedMove = null;
+  const oppMove = moveMap[oppMoveId];
 
   if (oppMove.effect === 'deferred') {
-    bs.deferredDamage      = oppMove.damage;
-    bs.lastProfessorDamage = 0;
-    text(`${bs.professor.name} uses ${oppMove.name}. The effect is delayed...`);
-    bs.lastNpcEffect       = oppMove.effect;
-    bs.pendingSwappedEffect = null;
+    player.deferredIncoming = oppMove.damage;
+    opponent.lastDamage     = 0;
+    text(`${opponent.name} uses ${oppMove.name}. The effect is delayed...`);
+    opponent.lastEffect     = oppMove.effect;
+    opponent.pendingSwapped = null;
     return null;
   }
 
-  let profDamage = oppMove.damage;
+  let dmg = oppMove.damage;
 
-  if (bs.professorHalved) {
-    profDamage         = Math.floor(profDamage / 2);
-    bs.professorHalved = false;
-    text(`${bs.professor.name}'s move is weakened!`);
-  }
+  if (opponent.outgoingHalved)  { dmg = Math.floor(dmg / 2); opponent.outgoingHalved = false; text(`${opponent.name}'s move is weakened!`); }
+  if (opponent.outgoingDoubled) { dmg *= 2; opponent.outgoingDoubled = false; }
+  if (opponent.outgoingBonus > 0){ dmg += opponent.outgoingBonus; opponent.outgoingBonus = 0; }
+  if (opponent.boostedTurns > 0){ dmg += opponent.boostedAmount; opponent.boostedTurns--; }
 
-  if (bs.npcDoubledNext)  { profDamage *= 2;  bs.npcDoubledNext  = false; }
-  if (bs.npcHalvedNext)   { profDamage  = Math.floor(profDamage / 2); bs.npcHalvedNext = false; }
-  if (bs.npcBoostNext10)  { profDamage += 10; bs.npcBoostNext10  = false; }
-  if (bs.npcBoostedTurns > 0) { profDamage += 20; bs.npcBoostedTurns--; }
+  // chance_mutual_damage_30: the attack damage equals mutualDamage (both sides pay the same cost).
+  if (oppMove.effect === 'chance_mutual_damage_30') dmg = oppMove.mutualDamage ?? 30;
+  if (oppMove.effect === 'chance_fail'     && Math.random() < (oppMove.failureChance ?? 0.2)) dmg = 0;
+  if (oppMove.effect === 'chance_bonus_10' && Math.random() < (oppMove.bonusChance ?? 0.3))   dmg += (oppMove.bonusAmount ?? 10);
+  if (oppMove.effect === 'conditional_damage' && player.lastDamage >= 30) dmg = 40;
 
-  // chance_mutual_damage_30: NPC mutual damage uses move.mutualDamage; NPC side handled in the effect handler.
-  if (oppMove.effect === 'chance_mutual_damage_30') profDamage = oppMove.mutualDamage ?? 30;
+  dmg = Math.max(0, dmg - engine.getState().defenseStat);
 
-  if (oppMove.effect === 'chance_fail'     && Math.random() < (oppMove.failureChance ?? 0.2)) profDamage = 0;
-  if (oppMove.effect === 'chance_bonus_10' && Math.random() < (oppMove.bonusChance ?? 0.3))   profDamage += (oppMove.bonusAmount ?? 10);
-  if (oppMove.effect === 'conditional_damage' && bs.lastPlayerDamage >= 30) profDamage = 40;
+  const fromPlayerHP = player.hp;
+  player.hp = Math.max(0, player.hp - dmg);
+  opponent.lastDamage = dmg;
 
-  profDamage = Math.max(0, profDamage - engine.getState().defenseStat);
-
-  const fromPHP = engine.getState().playerHP;
-  const toPHP   = fromPHP - profDamage;
-  engine.setPlayerHP(toPHP);
-  bs.lastProfessorDamage = profDamage;
-
-  if (profDamage > 0) {
-    text(`${bs.professor.name} uses ${oppMove.name}! Deals ${profDamage} damage.`);
+  if (dmg > 0) {
+    text(`${opponent.name} uses ${oppMove.name}! Deals ${dmg} damage.`);
   } else {
-    text(`${bs.professor.name} uses ${oppMove.name}!`);
+    text(`${opponent.name} uses ${oppMove.name}!`);
   }
-  animPl(fromPHP, Math.max(0, toPHP));
+  animPl(fromPlayerHP, player.hp);
 
-  const handler = opponentEffects[oppMove.effect];
+  const extCtx = {
+    ...ctx, move: oppMove,
+    self: opponent, target: player,
+    animSelf: animP, animTarget: animPl,
+    selfFaintResult: 'win', targetFaintResult: 'loss',
+    actingSide: 'opponent',
+  };
+
+  const handler = effects[oppMove.effect];
   if (handler) {
-    const result = handler({ ...ctx, move: oppMove });
-    if (result) return result;
+    const result = handler(extCtx);
+    if (result) { engine.setPlayerHP(player.hp); return result; }
   }
 
-  if (bs.pendingSwappedEffect && bs.pendingSwappedEffect !== 'swap_effect') {
-    const swapHandler = opponentEffects[bs.pendingSwappedEffect];
+  if (opponent.pendingSwapped && opponent.pendingSwapped !== 'swap_effect') {
+    const swapHandler = effects[opponent.pendingSwapped];
     if (swapHandler) {
-      const swapResult = swapHandler({ ...ctx, move: oppMove });
-      if (swapResult) { bs.pendingSwappedEffect = null; return swapResult; }
+      const swapResult = swapHandler(extCtx);
+      if (swapResult) { opponent.pendingSwapped = null; engine.setPlayerHP(player.hp); return swapResult; }
     }
-    bs.pendingSwappedEffect = null;
+    opponent.pendingSwapped = null;
   }
-  bs.lastNpcEffect = oppMove.effect;
+  opponent.lastEffect = oppMove.effect;
 
-  if (toPHP <= 0) {
+  engine.setPlayerHP(player.hp);
+
+  if (player.hp <= 0) {
     text('You fainted!');
     return 'loss';
   }

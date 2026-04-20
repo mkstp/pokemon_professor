@@ -142,67 +142,41 @@ export default class BattleScene extends Phaser.Scene {
     // 'professor' stores the opponent object regardless of opponentType — the field
     // name is legacy from when only professors were opponents.
     //
-    // Professor battle effects:
-    //   professorSkipped    — set by player 'skip' effect; opponent skips next turn
-    //   professorHalved     — set by player 'halve_next'; opponent's next move halved
-    //   deferredDamage      — set by professor 'deferred'; applied next opponent turn
-    //   lastProfessorDamage — opponent's last damage dealt (for player 'counter' check)
-    //
-    // Student NPC / npcMove effects:
-    //   playerSkipped       — set by NPC 'skip_opponent'; player skips next action
-    //   npcSkippedTurns     — turns NPC skips due to its own exhaustion (skip_self, skip_self_2)
-    //   npcHalvedNext       — NPC's next move deals half damage (halve_self_next)
-    //   npcDoubledNext      — NPC's next move deals double damage (double_next)
-    //   npcBoostNext10      — NPC's next move +10 damage (chance_boost_next_10)
-    //   npcBoostedTurns     — remaining turns NPC's moves get +20 (boost_next_2)
-    //   npcVulnTurns        — turns NPC takes +5 extra incoming damage (self_vuln_next / self_vuln_2)
-    //   npcIncomingHalved   — NPC's next incoming damage halved (heal_and_shield)
-    //   playerReducedNext10 — flat reduction on player's next move damage (reduce_next_10, heal_and_reduce_next)
-    //   lastPlayerDamage    — player's last damage dealt (for NPC 'conditional_damage' check)
-    //
-    // Bidirectional move effects (reveal_next / priority / swap_effect):
-    //   npcRevealedMove            — pre-rolled NPC move id; used next applyOpponentTurn instead of random
-    //   npcPriority                — NPC acts first next turn (set by NPC 'priority'; cleared by playerPriority)
-    //   lastNpcEffect              — effect of last NPC move (for NPC swap_effect)
-    //   pendingSwappedEffect       — NPC effect to echo next turn (set by NPC swap_effect)
-    //   playerLockedMove           — move id player is forced to re-use next turn (set by NPC reveal_next)
-    //   playerPriority             — player acts first even if npcPriority is set
-    //   lastPlayerEffect           — effect of last player move (for player swap_effect)
-    //   pendingPlayerSwappedEffect — player effect to echo next turn (set by player swap_effect)
+    // Symmetric entity model: bs.player and bs.opponent expose the same interface.
+    // resolver.js swaps self/target references on each turn so the unified effects
+    // map works identically regardless of which side is acting.
+    const { playerHP, playerMaxHP } = engine.getState();
+    const makeEntity = ({ hp, maxHP, name }) => ({
+      hp, maxHP, name,
+      skippedTurns:    0,
+      outgoingHalved:  false,
+      outgoingDoubled: false,
+      outgoingBonus:   0,
+      boostedTurns:    0,
+      boostedAmount:   0,
+      vulnTurns:       0,
+      vulnBonus:       5,
+      incomingHalved:  false,
+      reducedNext:     0,
+      priority:        false,
+      lastDamage:      0,
+      lastEffect:      null,
+      pendingSwapped:  null,
+      deferredIncoming: 0,
+      lockedMove:      null,
+    });
     this.battleState = {
-      professor:                   prof,
-      professorHP:                 prof.hp,
-      playerMoves:                 activeMoves,
-      selectedMoveIndex:           0,
-      menuLevel:                   'action', // 'action' | 'moves' | 'items'
-      selectedActionIndex:         0,
-      selectedItemIndex:           0,
-      itemScrollOffset:            0,
-      phase:                       'select', // 'select' | 'resolve' | 'animating' | 'end' | 'done'
-      outcome:                     null,     // null | 'win' | 'loss' | 'fled'
-      disrupted:                   false,
-      professorSkipped:            false,
-      professorHalved:             false,
-      deferredDamage:              0,
-      lastProfessorDamage:         0,
-      playerSkipped:               false,
-      npcSkippedTurns:             0,
-      npcHalvedNext:               false,
-      npcDoubledNext:              false,
-      npcBoostNext10:              false,
-      npcBoostedTurns:             0,
-      npcVulnTurns:                0,
-      npcIncomingHalved:           false,
-      playerReducedNext10:         0,
-      lastPlayerDamage:            0,
-      npcRevealedMove:             null,
-      npcPriority:                 false,
-      lastNpcEffect:               null,
-      pendingSwappedEffect:        null,
-      playerLockedMove:            null,
-      playerPriority:              false,
-      lastPlayerEffect:            null,
-      pendingPlayerSwappedEffect:  null,
+      professor:           prof,
+      player:              makeEntity({ hp: playerHP, maxHP: playerMaxHP, name: 'You' }),
+      opponent:            makeEntity({ hp: prof.hp,  maxHP: prof.hp,     name: prof.name }),
+      playerMoves:         activeMoves,
+      selectedMoveIndex:   0,
+      menuLevel:           'action', // 'action' | 'moves' | 'items'
+      selectedActionIndex: 0,
+      selectedItemIndex:   0,
+      itemScrollOffset:    0,
+      phase:               'select', // 'select' | 'resolve' | 'animating' | 'end' | 'done'
+      outcome:             null,     // null | 'win' | 'loss' | 'fled'
     };
 
     // --- Background ---
@@ -470,10 +444,10 @@ export default class BattleScene extends Phaser.Scene {
     // Deferred damage always applies first, regardless of priority.
     if (applyDeferredDamage(ctx)) return this._endSeq(seq, 'loss');
 
-    // Priority: NPC goes first only if npcPriority is set and playerPriority is not.
-    const npcGoesFirst = bs.npcPriority && !bs.playerPriority;
-    bs.npcPriority    = false;
-    bs.playerPriority = false;
+    // Priority: NPC goes first only if opponent.priority is set and player.priority is not.
+    const npcGoesFirst = bs.opponent.priority && !bs.player.priority;
+    bs.opponent.priority = false;
+    bs.player.priority   = false;
 
     if (npcGoesFirst) {
       const profResult = applyOpponentTurn(ctx);
@@ -537,7 +511,7 @@ export default class BattleScene extends Phaser.Scene {
   // Called once on scene creation; individual bars are updated via the
   // _drawProfHPBar / _drawPlayerHPBar helpers during animations.
   drawHPBars() {
-    this._drawProfHPBar(this.battleState.professorHP);
+    this._drawProfHPBar(this.battleState.opponent.hp);
     this._drawPlayerHPBar(engine.getState().playerHP);
     const { xp, xpToNextLevel } = engine.getState();
     this._drawPlayerXPBar(xp, xpToNextLevel);
