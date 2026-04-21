@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Issues — pokemon_professor</title>
+  <link rel="stylesheet" href="report.css">
+  <style>
+    .page-nav {
+      display: flex;
+      gap: 0.25rem;
+      margin-top: 1rem;
+    }
+    .nav-link {
+      font-size: 0.8rem;
+      color: #64748b;
+      text-decoration: none;
+      padding: 0.25rem 0.75rem;
+      border: 1px solid #2d3348;
+      border-radius: 999px;
+      transition: all 0.15s;
+    }
+    .nav-link:hover { color: #cbd5e1; border-color: #4f6d9e; }
+    .nav-link.active { color: #93c5fd; border-color: #4f6d9e; background: #1e3a5f; }
+
+    .toolbar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+    .filter-btn {
+      background: #1a1f2e;
+      border: 1px solid #2d3348;
+      border-radius: 999px;
+      color: #64748b;
+      font-size: 0.78rem;
+      padding: 0.25rem 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .filter-btn:hover { border-color: #4f6d9e; color: #cbd5e1; }
+    .filter-btn.active { border-color: #4f6d9e; color: #93c5fd; background: #1e3a5f; }
+
+    .issue-card {
+      background: #1a1f2e;
+      border: 1px solid #2d3348;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      overflow: hidden;
+    }
+    .issue-card-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .issue-card-header:hover { background: #232938; }
+    .issue-id {
+      font-size: 0.72rem;
+      color: #475569;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .issue-card-title { flex: 1; color: #e2e8f0; font-weight: 500; line-height: 1.4; }
+    .issue-badges { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
+    .badge-priority {
+      font-size: 0.7rem;
+      padding: 0.1rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .p0 { background: #4c0519; color: #fca5a5; }
+    .p1 { background: #431407; color: #fb923c; }
+    .p2 { background: #422006; color: #fbbf24; }
+    .p3 { background: #1e3a5f; color: #93c5fd; }
+    .p4 { background: #1e2130; color: #64748b; }
+
+    .issue-card-body {
+      display: none;
+      padding: 0.75rem 1rem 1rem;
+      border-top: 1px solid #2d3348;
+      font-size: 0.875rem;
+      color: #94a3b8;
+    }
+    .issue-card.expanded .issue-card-body { display: block; }
+    .issue-meta-grid {
+      display: grid;
+      grid-template-columns: 6rem 1fr;
+      gap: 0.3rem 0.75rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.8rem;
+    }
+    .meta-key {
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.7rem;
+      padding-top: 0.15rem;
+    }
+    .meta-val { color: #94a3b8; }
+    .issue-desc {
+      line-height: 1.6;
+      border-top: 1px solid #2d3348;
+      padding-top: 0.75rem;
+    }
+
+    .group-section { margin-bottom: 2.5rem; }
+    .group-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #475569;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid #2d3348;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .group-count {
+      background: #232938;
+      color: #64748b;
+      border-radius: 999px;
+      padding: 0.05rem 0.5rem;
+      font-size: 0.7rem;
+    }
+
+    .stale-note {
+      background: #1a1f2e;
+      border: 1px solid #3d2200;
+      border-radius: 6px;
+      color: #92400e;
+      font-size: 0.8rem;
+      padding: 0.5rem 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stale-note strong { color: #fbbf24; }
+    .stale-note code {
+      background: #232938;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.78rem;
+    }
+  </style>
+</head>
+<body>
+
+<header class="page-header">
+  <h1 id="page-title">Issues</h1>
+  <div class="header-meta">
+    <span id="generated-at"></span>
+    <span id="total-count"></span>
+  </div>
+  <nav class="page-nav">
+    <a href="report.html" class="nav-link">Report</a>
+    <a href="issues.html" class="nav-link active">Issues</a>
+  </nav>
+</header>
+
+<div class="container">
+
+  <div id="stale-warning" class="stale-note" style="display:none">
+    <strong>Data may be stale.</strong> Run <code>./serve</code> or <code>./show-issues</code> from the project root to refresh.
+  </div>
+
+  <div class="stats-row" id="stats-row"></div>
+
+  <div class="search-wrapper">
+    <input type="text" id="search" placeholder="Search issues…" autocomplete="off">
+  </div>
+
+  <div class="toolbar" id="toolbar"></div>
+
+  <div id="issues-list"></div>
+
+</div>
+
+<footer>Issues viewer &middot; Refresh with <code style="background:#1a1f2e;padding:0.1rem 0.35rem;border-radius:3px;font-size:0.78rem">./serve</code></footer>
+
+<script src="issues-data.js"></script>
+<script>
+(function () {
+  const issues = window.ISSUES_DATA || [];
+  const generatedAt = window.ISSUES_GENERATED_AT || null;
+
+  // Stale warning > 10 min
+  if (generatedAt) {
+    const ageMs = Date.now() - new Date(generatedAt).getTime();
+    document.getElementById('generated-at').textContent =
+      'Generated ' + new Date(generatedAt).toLocaleTimeString();
+    if (ageMs > 10 * 60 * 1000) {
+      document.getElementById('stale-warning').style.display = '';
+    }
+  }
+
+  // Priority helpers
+  const PRIORITY_LABEL = { 0: 'P0', 1: 'P1', 2: 'P2', 3: 'P3', 4: 'P4' };
+  const PRIORITY_CLASS = { 0: 'p0', 1: 'p1', 2: 'p2', 3: 'p3', 4: 'p4' };
+  const STATUS_LABEL = {
+    open: 'Open', in_progress: 'In Progress', blocked: 'Blocked',
+    closed: 'Closed', deferred: 'Deferred', not_started: 'Not Started',
+  };
+  // Display order for grouped view
+  const STATUS_ORDER = ['open', 'in_progress', 'blocked', 'deferred', 'closed'];
+
+  // Count per status
+  const counts = {};
+  issues.forEach(i => { counts[i.status] = (counts[i.status] || 0) + 1; });
+  const total = issues.length;
+  document.getElementById('total-count').textContent = total + ' issues';
+
+  // Stats row
+  const statsRow = document.getElementById('stats-row');
+  STATUS_ORDER.filter(s => counts[s] > 0).forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.style.cursor = 'pointer';
+    card.innerHTML = `<span class="stat-n">${counts[s]}</span><span class="stat-label">${STATUS_LABEL[s]}</span>`;
+    card.addEventListener('click', () => setFilter(s));
+    statsRow.appendChild(card);
+  });
+
+  // Read ?status= param from URL for deep-linking from report.html
+  const urlStatus = new URLSearchParams(location.search).get('status') || 'all';
+  let activeStatus = urlStatus;
+
+  // Toolbar filter buttons
+  const toolbar = document.getElementById('toolbar');
+  const allStatuses = ['all', ...STATUS_ORDER.filter(s => counts[s] > 0)];
+
+  function setFilter(s) {
+    activeStatus = s;
+    toolbar.querySelectorAll('.filter-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.status === s));
+    render();
+  }
+
+  allStatuses.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (s === activeStatus ? ' active' : '');
+    btn.dataset.status = s;
+    const n = s === 'all' ? total : (counts[s] || 0);
+    btn.textContent = `${s === 'all' ? 'All' : STATUS_LABEL[s]} (${n})`;
+    btn.addEventListener('click', () => setFilter(s));
+    toolbar.appendChild(btn);
+  });
+
+  // Search
+  const searchEl = document.getElementById('search');
+  searchEl.addEventListener('input', render);
+
+  const list = document.getElementById('issues-list');
+
+  function render() {
+    const q = searchEl.value.toLowerCase().trim();
+
+    let visible = issues.filter(i => {
+      if (activeStatus !== 'all' && i.status !== activeStatus) return false;
+      if (!q) return true;
+      return (i.title + ' ' + i.id + ' ' + (i.description || '')).toLowerCase().includes(q);
+    });
+
+    // Sort within each group: priority asc, then updated desc
+    visible.sort((a, b) =>
+      (a.priority - b.priority) || (b.updated_at > a.updated_at ? 1 : -1));
+
+    list.innerHTML = '';
+
+    if (!visible.length) {
+      list.innerHTML = '<p class="no-results">No issues match.</p>';
+      return;
+    }
+
+    if (activeStatus === 'all') {
+      // Render as grouped sections in STATUS_ORDER
+      const grouped = {};
+      STATUS_ORDER.forEach(s => { grouped[s] = []; });
+      visible.forEach(i => { (grouped[i.status] = grouped[i.status] || []).push(i); });
+      STATUS_ORDER.forEach(s => {
+        const items = grouped[s] || [];
+        if (!items.length) return;
+        const section = document.createElement('div');
+        section.className = 'group-section';
+        section.innerHTML = `<div class="group-label">${STATUS_LABEL[s]}<span class="group-count">${items.length}</span></div>`;
+        items.forEach(i => section.appendChild(makeCard(i)));
+        list.appendChild(section);
+      });
+    } else {
+      visible.forEach(i => list.appendChild(makeCard(i)));
+    }
+  }
+
+  function makeCard(issue) {
+    const card = document.createElement('div');
+    card.className = 'issue-card';
+    const p = issue.priority ?? 3;
+    card.innerHTML = `
+      <div class="issue-card-header">
+        <span class="issue-id">${issue.id}</span>
+        <span class="issue-card-title">${issue.title}</span>
+        <div class="issue-badges">
+          <span class="badge-priority ${PRIORITY_CLASS[p]}">${PRIORITY_LABEL[p] || 'P' + p}</span>
+          <span class="issue-status status-${issue.status}">${STATUS_LABEL[issue.status] || issue.status}</span>
+        </div>
+      </div>
+      <div class="issue-card-body">
+        <div class="issue-meta-grid">
+          <span class="meta-key">Type</span><span class="meta-val">${issue.issue_type || '—'}</span>
+          <span class="meta-key">Assignee</span><span class="meta-val">${issue.assignee || '—'}</span>
+          <span class="meta-key">Created</span><span class="meta-val">${fmtDate(issue.created_at)}</span>
+          <span class="meta-key">Updated</span><span class="meta-val">${fmtDate(issue.updated_at)}</span>
+        </div>
+        ${issue.description ? `<div class="issue-desc">${issue.description}</div>` : ''}
+      </div>`;
+    card.querySelector('.issue-card-header').addEventListener('click', () =>
+      card.classList.toggle('expanded'));
+    return card;
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

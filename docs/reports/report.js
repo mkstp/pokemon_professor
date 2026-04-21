@@ -137,11 +137,10 @@ const fetchRequired = url =>
  * Generate issues.jsonl before serving with: bd export --no-memories -o reports/issues.jsonl
  */
 async function loadData() {
-  const base = '../project_context/';
   const [jsonlRes, charterRes, deliverablesRes, issuesRes] = await Promise.allSettled([
     fetchRequired('change_and_decision_log.jsonl'),
-    fetchRequired(base + 'project_charter.md'),
-    fetch(base + 'deliverables.md').then(r => r.ok ? r.text() : ''),
+    fetchRequired('../project_charter.md'),
+    fetch('../deliverables.md').then(r => r.ok ? r.text() : ''),
     fetch('issues.jsonl').then(r => r.ok ? r.text().then(parseJsonl) : []),
   ]);
 
@@ -170,11 +169,13 @@ function renderStats(sessions, issues) {
 
   const card = (n, label) =>
     `<div class="stat-card"><span class="stat-n">${n}</span><span class="stat-label">${label}</span></div>`;
+  const linkedCard = (n, label, href) =>
+    `<a href="${href}" class="stat-card-link">${card(n, label)}</a>`;
 
   return `<div class="stats-row">
     ${card(hoursLabel, 'Hours Logged')}
-    ${card(openCount, 'Open Issues')}
-    ${card(closedCount, 'Closed Issues')}
+    ${linkedCard(openCount, 'Open Issues', 'issues.html')}
+    ${linkedCard(closedCount, 'Closed Issues', 'issues.html?status=closed')}
   </div>`;
 }
 

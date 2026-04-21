@@ -5,6 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Project Report</title>
   <link rel="stylesheet" href="report.css">
+  <style>
+    .page-nav {
+      display: flex;
+      gap: 0.25rem;
+      margin-top: 1rem;
+    }
+    .nav-link {
+      font-size: 0.8rem;
+      color: #64748b;
+      text-decoration: none;
+      padding: 0.25rem 0.75rem;
+      border: 1px solid #2d3348;
+      border-radius: 999px;
+      transition: all 0.15s;
+    }
+    .nav-link:hover { color: #cbd5e1; border-color: #4f6d9e; }
+    .nav-link.active { color: #93c5fd; border-color: #4f6d9e; background: #1e3a5f; }
+    .stat-card-link { text-decoration: none; display: block; }
+    .stat-card-link .stat-card { cursor: pointer; transition: border-color 0.15s; }
+    .stat-card-link:hover .stat-card { border-color: #4f6d9e; }
+  </style>
 </head>
 <body>
 
@@ -13,13 +34,16 @@
   <div class="header-meta">
     <span id="report-date"></span>
   </div>
+  <nav class="page-nav">
+    <a href="report.html" class="nav-link active">Report</a>
+    <a href="issues.html" class="nav-link">Issues</a>
+  </nav>
 </header>
 
 <div class="container" id="app">
   <p style="color:#6b7280;padding:2rem 0">Loading report data…</p>
 </div>
 
-<script src="report-data.js"></script>
 <script src="report.js"></script>
 </body>
 </html>
