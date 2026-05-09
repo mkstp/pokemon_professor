@@ -40,6 +40,8 @@ You help ensure outputs meet standards:
 
 ### 4. Code Quality Assurance
 
+> **Tests are browser-only.** Do not attempt `node tests/runner.js` — Node.js is not installed. The test suite runs in a browser at `tests/index.html`. Open that file via the local server (`./serve`) to run tests.
+
 ### Before Writing Code
 
 1. **Load the TDD** — Always read the relevant section of `docs/technical_design_document.md` before touching src files

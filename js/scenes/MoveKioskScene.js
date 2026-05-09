@@ -8,11 +8,11 @@
 // Depends on: engine.js (state reads/writes), data/moves.js
 
 import * as engine        from '../engine.js';
-import { playerMoves, professorMoves, npcMoves } from '../data/moves.js';
+import { professorMoves, npcMoves } from '../data/moves.js';
 
-// Unified move lookup across all three tables. IDs are globally unique.
+// Unified move lookup across both tables. IDs are globally unique.
 const ALL_MOVE_MAP = Object.fromEntries(
-  [...professorMoves, ...npcMoves, ...playerMoves].map(m => [m.id, m])
+  [...professorMoves, ...npcMoves].map(m => [m.id, m])
 );
 
 // ── Layout constants (canvas pixels) ─────────────────────────────────────────

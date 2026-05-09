@@ -14,7 +14,7 @@ import * as engine from '../engine.js';
 
 import { professors }                            from '../data/professors.js';
 import { studentNPCs }                           from '../data/students.js';
-import { playerMoves, professorMoves, npcMoves } from '../data/moves.js';
+import { professorMoves, npcMoves } from '../data/moves.js';
 import { items }                                 from '../data/items.js';
 import { applyDeferredDamage, applyPlayerMove, applyOpponentTurn } from './battle/resolver.js';
 
@@ -70,10 +70,10 @@ const HP_ANIM_MS = 1200;
 // Brief pause after an HP animation completes before the next step begins (ms).
 const HP_POST_PAUSE = 500;
 
-// Unified move lookup across all three tables. IDs are globally unique, so merging is safe.
+// Unified move lookup across both tables. IDs are globally unique, so merging is safe.
 // Used to resolve activeMoves IDs to move objects regardless of which table they originated from.
 const ALL_MOVE_MAP = Object.fromEntries(
-  [...professorMoves, ...npcMoves, ...playerMoves].map(m => [m.id, m])
+  [...professorMoves, ...npcMoves].map(m => [m.id, m])
 );
 
 // XP awarded to the player on battle victory, by opponent type.
@@ -444,10 +444,15 @@ export default class BattleScene extends Phaser.Scene {
     // Deferred damage always applies first, regardless of priority.
     if (applyDeferredDamage(ctx)) return this._endSeq(seq, 'loss');
 
-    // Priority: NPC goes first only if opponent.priority is set and player.priority is not.
-    const npcGoesFirst = bs.opponent.priority && !bs.player.priority;
+    // Priority resolution:
+    //   opponent.priority only  → opponent goes first
+    //   both or neither         → player goes first (default)
+    //   player.priority only    → player goes first + outgoingBonus +10 on their move
+    const npcGoesFirst        = bs.opponent.priority && !bs.player.priority;
+    const playerPriorityBonus = bs.player.priority   && !bs.opponent.priority;
     bs.opponent.priority = false;
     bs.player.priority   = false;
+    if (playerPriorityBonus) bs.player.outgoingBonus += 10;
 
     if (npcGoesFirst) {
       const profResult = applyOpponentTurn(ctx);

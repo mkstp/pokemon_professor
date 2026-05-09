@@ -23,7 +23,7 @@ const STARTING_XP     = 0;
 const XP_PER_LEVEL    = 70;  // XP required to reach each successive level
 
 // The 4 moves the player starts with and uses as their default battle loadout.
-// IDs must match entries in the playerMoves array in data/moves.js.
+// IDs must match entries in the npcMoves array in data/moves.js.
 const STARTING_MOVE_IDS = ['impostor_syndrome', 'hot_take', 'non_sequitur', 'undergrad_flashback'];
 
 // Per-level stat gains applied when awardXP() triggers a level-up.

@@ -406,7 +406,7 @@ export const items = [
   },
   {
     id: 'community_badge',
-    name: 'Community Badge',
+    name: 'Conversations That Matter Badge',
     flavourText: null,
     category: 'badge',
     effect: { action: 'none', value: null },

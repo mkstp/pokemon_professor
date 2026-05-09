@@ -19,7 +19,7 @@
 //   skippedTurns, outgoingHalved, outgoingDoubled, outgoingBonus,
 //   boostedTurns, boostedAmount, vulnTurns, vulnBonus,
 //   incomingHalved, reducedNext, priority,
-//   lastDamage, lastEffect, pendingSwapped, deferredIncoming, lockedMove
+//   lastDamage, lastEffect, pendingSwapped, deferredIncoming, lockedMove, guessedMove
 //
 // applyPlayerMove binds self=player / target=opponent before dispatching.
 // applyOpponentTurn binds self=opponent / target=player before dispatching.
@@ -44,17 +44,9 @@ const NPC_MOVE_MAP  = Object.fromEntries(npcMoves.map(m => [m.id, m]));
 const effects = {
 
   // ── Stun / skip target ────────────────────────────────────────────────────
-  skip({ target, text }) {
-    target.skippedTurns = Math.max(target.skippedTurns, 1);
-    text(`${target.name} is stunned — skips their next turn.`);
-  },
   skip_opponent({ target, text }) {
     target.skippedTurns = Math.max(target.skippedTurns, 1);
     text(`${target.name} is stunned — skips their next turn.`);
-  },
-  disrupt({ target, text }) {
-    target.outgoingHalved = true;
-    text(`${target.name}'s next move will deal half damage.`);
   },
   halve_next({ target, text }) {
     target.outgoingHalved = true;
@@ -95,23 +87,29 @@ const effects = {
     text(`${self.name} recovers ${gained} HP.`);
     animSelf(oldHP, self.hp);
   },
+  // halves your next attack damage
   halve_self_next({ self }) {
     self.outgoingHalved = true;
   },
+  //doubles your next attack damage
   double_next({ self, text }) {
     self.outgoingDoubled = true;
     text(`${self.name} charges up for a powerful next move!`);
   },
+  //skips your next turn
   skip_self({ self, move }) {
     self.skippedTurns = Math.max(self.skippedTurns, move.skipTurns ?? 1);
   },
+  //increases the damage dealt to you by the opponent for x turns
   self_vuln({ self, move }) {
     self.vulnTurns = Math.max(self.vulnTurns, move.vulnTurns ?? 1);
     self.vulnBonus = move.vulnBonus ?? 5;
   },
+  //chance to boost your damage on next turn
   chance_boost_next({ self, move }) {
     if (Math.random() < (move.boostChance ?? 0.5)) self.outgoingBonus += (move.boostAmount ?? 10);
   },
+  //chance to boost your damage over x next turns
   boost_sustained({ self, text, move }) {
     self.boostedTurns  = move.boostTurns  ?? 2;
     self.boostedAmount = move.boostAmount ?? 20;
@@ -136,6 +134,7 @@ const effects = {
     target.reducedNext += (move.reduceAmount ?? 10);
     text(`${target.name}'s next move is weakened.`);
   },
+  //heals self and reduced next turns impact by a flat amount
   heal_and_reduce_next({ self, target, text, animSelf, move }) {
     const oldHP = self.hp;
     self.hp = Math.min(self.maxHP, self.hp + (move.healAmount ?? 0));
@@ -144,6 +143,8 @@ const effects = {
     text(`${self.name} recovers ${gained} HP. ${target.name}'s next move is weakened.`);
     animSelf(oldHP, self.hp);
   },
+
+  //heals and reduces next turns impact by half
   heal_and_shield({ self, text, animSelf, move }) {
     const oldHP = self.hp;
     self.hp = Math.min(self.maxHP, self.hp + (move.healAmount ?? 0));
@@ -217,6 +218,26 @@ const effects = {
     }
   },
 
+  // ── Move prediction / cancel ──────────────────────────────────────────────
+  // self randomly guesses one of target's moves. If the guess matches the move
+  // target actually uses on their next turn, that move is cancelled (no damage,
+  // no effect). Checked at the top of applyOpponentTurn / applyPlayerMove.
+  cancel_effect({ self, target, text, bs, actingSide, opponentType }) {
+    if (actingSide === 'player') {
+      const moveMap = opponentType === 'student' ? NPC_MOVE_MAP : PROF_MOVE_MAP;
+      const moveIds = bs.professor.moves;
+      const guessedId = moveIds[Math.floor(Math.random() * moveIds.length)];
+      self.guessedMove = guessedId;
+      const guessedName = moveMap[guessedId]?.name ?? guessedId;
+      text(`${self.name} predicts: ${guessedName}!`);
+    } else {
+      const playerMoveList = bs.playerMoves;
+      const guessedMove = playerMoveList[Math.floor(Math.random() * playerMoveList.length)];
+      self.guessedMove = guessedMove.id;
+      text(`${self.name} predicts your next move: ${guessedMove.name}!`);
+    }
+  },
+
   // ── Pre-damage modifiers (resolved before the main damage step) ───────────
   counter:            null,
   conditional_damage: null,
@@ -272,6 +293,16 @@ export function applyPlayerMove(ctx) {
     ? (bs.playerMoves.find(m => m.id === lockedId) ?? bs.playerMoves[bs.selectedMoveIndex])
     : bs.playerMoves[bs.selectedMoveIndex];
   if (lockedId) text(`You're locked in — forced to use ${move.name}!`);
+
+  if (opponent.guessedMove) {
+    const guessed = opponent.guessedMove;
+    opponent.guessedMove = null;
+    if (guessed === move.id) {
+      text(`${opponent.name} predicted correctly — your ${move.name} is cancelled!`);
+      engine.setPlayerHP(player.hp);
+      return null;
+    }
+  }
 
   // counter / conditional_damage: deal 40 if opponent's last move dealt ≥ 30.
   let dmg = (move.effect === 'counter' || move.effect === 'conditional_damage') && opponent.lastDamage >= 30
@@ -355,6 +386,16 @@ export function applyOpponentTurn(ctx) {
   opponent.lockedMove = null;
   const oppMove = moveMap[oppMoveId];
 
+  if (player.guessedMove) {
+    const guessed = player.guessedMove;
+    player.guessedMove = null;
+    if (guessed === oppMoveId) {
+      text(`Prediction correct! ${opponent.name}'s ${oppMove.name} is cancelled!`);
+      engine.setPlayerHP(player.hp);
+      return null;
+    }
+  }
+
   if (oppMove.effect === 'deferred') {
     player.deferredIncoming = oppMove.damage;
     opponent.lastDamage     = 0;
@@ -378,6 +419,7 @@ export function applyOpponentTurn(ctx) {
   if (oppMove.effect === 'conditional_damage' && player.lastDamage >= 30) dmg = 40;
 
   dmg = Math.max(0, dmg - engine.getState().defenseStat);
+  if (player.vulnTurns > 0) { dmg += player.vulnBonus; player.vulnTurns--; }
 
   const fromPlayerHP = player.hp;
   player.hp = Math.max(0, player.hp - dmg);

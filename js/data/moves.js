@@ -1,40 +1,8 @@
 // data/moves.js — all move definitions
-// Three named pools: playerMoves (player loadout), professorMoves (professor opponents),
-// npcMoves (student NPC opponents). All ids are globally unique across pools.
+// Two named pools: professorMoves (professor opponents), npcMoves (student NPC opponents
+// and player loadout). All ids are globally unique across pools.
+// Player-equippable moves are marked at the top of npcMoves.
 'use strict';
-
-export const playerMoves = [
-  {
-    id: 'impostor_syndrome',
-    name: 'Impostor Syndrome',
-    damage: 8,
-    description: 'Hesitation creates vulnerability. User takes +5 damage next turn.',
-    effect: 'self_vuln',
-    vulnTurns: 1,
-    vulnBonus: 5,
-  },
-  {
-    id: 'hot_take',
-    name: 'Hot Take',
-    damage: 10,
-    description: 'Quick and irreverent. Always connects. Clears any disruption debuff.',
-    effect: 'clear_debuff',
-  },
-  {
-    id: 'non_sequitur',
-    name: 'Non-Sequitur',
-    damage: 0,
-    description: 'No damage — just bafflement. The professor\'s next move deals half damage.',
-    effect: 'halve_next',
-  },
-  {
-    id: 'undergrad_flashback',
-    name: 'Undergrad Flashback',
-    damage: 14,
-    description: 'Back to fundamentals. Clears opponent\'s active buffs.',
-    effect: 'clear_buffs',
-  },
-];
 
 export const professorMoves = [
 
@@ -42,7 +10,7 @@ export const professorMoves = [
   {
     id: 'minimal_pair',
     name: 'Minimal Pair',
-    damage: 18,
+    damage: 13,
     description: 'Exploits a subtle phonemic distinction the student almost missed.',
     effect: null,
   },
@@ -56,7 +24,7 @@ export const professorMoves = [
   {
     id: 'stress_shift',
     name: 'Stress Shift',
-    damage: 16,
+    damage: 8,
     description: 'Disrupts the student\'s rhythm — 50% change their next move is cancelled.',
     effect: 'chance_skip_opponent',
     skipChance: 0.5,
@@ -73,28 +41,29 @@ export const professorMoves = [
   {
     id: 'passive_voice',
     name: 'Passive Voice',
-    damage: 20,
+    damage: 12,
     description: 'The agent is obscured. The threat arrives indirectly.',
     effect: null,
   },
   {
     id: 'xbar_probe',
     name: 'X-Bar Probe',
-    damage: 22,
-    description: 'A precise, rule-governed strike targeting structural weakness.',
-    effect: null,
+    damage: 15,
+    description: 'A precise, rule-governed strike targeting structural weakness. Chance to increase next turn damage by 5',
+    effect: 'chance_boost_next',
+    boostAmount: 5
   },
   {
     id: 'merge_op',
     name: 'Merge Op.',
-    damage: 32,
+    damage: 12,
     description: 'Two elements combine into something more powerful than either.',
     effect: null,
   },
   {
     id: 'deep_structure',
     name: 'Deep Structure',
-    damage: 28,
+    damage: 18,
     description: 'Attacks underlying form, not surface appearance.',
     effect: null,
   },
@@ -103,23 +72,23 @@ export const professorMoves = [
   {
     id: 'presupposition_failure',
     name: 'Presupposition Failure',
-    damage: 22,
+    damage: 18,
     description: 'Attacks an assumption the student didn\'t know they were making.',
     effect: null,
   },
   {
     id: 'scope_ambiguity',
     name: 'Scope Ambiguity',
-    damage: 20,
+    damage: 15,
     description: 'The effect is unclear until after it resolves.',
-    effect: 'deferred',
+    effect: 'chance_skip_opponent',
   },
   {
     id: 'entailment',
     name: 'Entailment',
-    damage: 30,
+    damage: 15,
     description: 'Slow and inevitable. If the premises hold, the conclusion follows.',
-    effect: null,
+    effect: 'double_next',
   },
   {
     id: 'deixis',
@@ -147,7 +116,7 @@ export const professorMoves = [
   {
     id: 'stack_overflow',
     name: 'Stack Overflow',
-    damage: 35,
+    damage: 25,
     description: 'Chaotic, unpredictable. Recursive descent that exceeds its bounds.',
     effect: null,
   },
@@ -155,8 +124,9 @@ export const professorMoves = [
     id: 'big_o',
     name: 'Big O',
     damage: 10,
-    description: 'More taunt than attack — reduces the student\'s next move\'s effectiveness.',
-    effect: 'disrupt',
+    description: 'More taunt than attack. 50% chance to stun the student, skipping their next move.',
+    effect: 'chance_skip_opponent',
+    skipChance: 0.5,
   },
 
   // ── Prof. Bayesio — NLP / Deep Learning ──────────────────────────────────
@@ -170,7 +140,7 @@ export const professorMoves = [
   {
     id: 'posterior',
     name: 'Posterior',
-    damage: 24,
+    damage: 18,
     description: 'Grows stronger as evidence accumulates. Resolves next turn.',
     effect: 'deferred',
   },
@@ -179,12 +149,12 @@ export const professorMoves = [
     name: 'Language Model',
     damage: 22,
     description: 'Predicts the student\'s next move and disrupts it.',
-    effect: 'disrupt',
+    effect: 'reveal_next',
   },
   {
     id: 'perplexity',
     name: 'Perplexity',
-    damage: 36,
+    damage: 25,
     description: 'High variance, unpredictable. How surprised are you about to be?',
     effect: null,
   },
@@ -233,8 +203,9 @@ export const professorMoves = [
     id: 'dep_parse',
     name: 'Dep. Parse',
     damage: 40,
-    description: 'Identifies the structural weak point and targets it precisely. Disrupts the student\'s next move.',
-    effect: 'disrupt',
+    description: 'Identifies the structural weak point and targets it precisely. 50% chance to stun the student, skipping their next move.',
+    effect: 'chance_skip_opponent',
+    skipChance: 0.5,
   },
   {
     id: 'corpus_crush',
@@ -242,7 +213,8 @@ export const professorMoves = [
     damage: 62,
     description: 'The weight of 400 million tokens, applied at once. Recoil: even the corpus takes a toll.',
     effect: 'self_damage',
-    recoilPercent: 0.25,
+    recoilPercent: 0.50,
+    recoilAmount: 30
   },
   {
     id: 'full_parse',
@@ -256,7 +228,7 @@ export const professorMoves = [
 
 export const npcMoves = [
 
-  // ── Pool moves (shared across multiple NPCs) ──────────────────────────────
+  // ── Player-equippable moves ───────────────────────────────────────────────
   {
     id: 'non_sequitur',
     name: 'Non-Sequitur',
@@ -276,17 +248,19 @@ export const npcMoves = [
   {
     id: 'hot_take',
     name: 'Hot Take',
-    damage: 10,
-    description: 'Cuts through confusion. Ignores user\'s active debuffs.',
-    effect: 'clear_debuff',
+    damage: 5,
+    description: 'Sharp and immediate. Acts first next turn — or deals +10 bonus damage if already going first.',
+    effect: 'priority',
   },
   {
     id: 'undergrad_flashback',
     name: 'Undergrad Flashback',
-    damage: 14,
+    damage: 11,
     description: 'Back to fundamentals. Clears opponent\'s active buffs.',
     effect: 'clear_buffs',
   },
+
+  // ── Pool moves (shared across multiple NPCs) ──────────────────────────────
   {
     id: 'whiteboard_spiral',
     name: 'Whiteboard Spiral',
@@ -298,14 +272,14 @@ export const npcMoves = [
   {
     id: 'counterexample',
     name: 'Counterexample',
-    damage: 20,
+    damage: 12,
     description: 'Bread-and-butter contradiction.',
     effect: null,
   },
   {
     id: 'peer_review',
     name: 'Peer Review',
-    damage: 17,
+    damage: 10,
     description: 'Constructive but limiting. Reduces opponent\'s next damage by 10 (flat).',
     effect: 'reduce_next_10',
     reduceAmount: 10,
@@ -321,7 +295,7 @@ export const npcMoves = [
   {
     id: 'group_project',
     name: 'Group Project',
-    damage: 18,
+    damage: 15,
     description: 'Sometimes it works. 30% chance to deal +10 bonus damage.',
     effect: 'chance_bonus_10',
     bonusChance: 0.3,
@@ -352,7 +326,7 @@ export const npcMoves = [
   {
     id: 'scope_creep',
     name: 'Scope Creep',
-    damage: 25,
+    damage: 15,
     description: 'Expands ambition, adds strain. User takes +5 damage for next 2 turns.',
     effect: 'self_vuln',
     vulnTurns: 2,
@@ -369,7 +343,7 @@ export const npcMoves = [
   {
     id: 'all_nighter',
     name: 'All-Nighter',
-    damage: 38,
+    damage: 26,
     description: 'High output, unsustainable. User takes 10 self-damage.',
     effect: 'self_damage',
     recoilAmount: 10,
@@ -377,14 +351,14 @@ export const npcMoves = [
   {
     id: 'overfit_model',
     name: 'Overfit Model',
-    damage: 30,
+    damage: 23,
     description: 'Strong now, weak generalization. User\'s next attack deals half damage.',
     effect: 'halve_self_next',
   },
   {
     id: 'deadline_panic',
     name: 'Deadline Panic',
-    damage: 35,
+    damage: 28,
     description: 'High risk execution. 20% chance to fail (deal 0 damage).',
     effect: 'chance_fail',
     failureChance: 0.2,
@@ -392,7 +366,7 @@ export const npcMoves = [
   {
     id: 'dataset_leak',
     name: 'Dataset Leak',
-    damage: 20,
+    damage: 15,
     description: 'Information advantage. Reveals opponent\'s next move.',
     effect: 'reveal_next',
   },
@@ -422,7 +396,7 @@ export const npcMoves = [
   {
     id: 'conference_talk',
     name: 'Conference Talk',
-    damage: 25,
+    damage: 20,
     description: 'Performative confidence. 50% chance to boost next move by +10 damage.',
     effect: 'chance_boost_next',
     boostChance: 0.5,
@@ -440,7 +414,7 @@ export const npcMoves = [
   {
     id: 'hallucination',
     name: 'Hallucination',
-    damage: 40,
+    damage: 30,
     description: 'Confident but untethered. 20% chance to deal 0 damage.',
     effect: 'chance_fail',
     failureChance: 0.2,
@@ -448,7 +422,7 @@ export const npcMoves = [
   {
     id: 'dataset_bias',
     name: 'Dataset Bias',
-    damage: 30,
+    damage: 25,
     description: 'Skewed training signal. Deals 40 if opponent\'s last move dealt ≥30 damage.',
     effect: 'conditional_damage',
   },
@@ -463,7 +437,7 @@ export const npcMoves = [
     id: 'beam_search',
     name: 'Beam Search',
     damage: 25,
-    description: 'Explores multiple paths. Hits twice for reduced damage.',
+    description: 'Explores multiple paths. +Hits for increased damage.',
     effect: 'chain_hit',
     chainHitChance: 0.5,
     maxChainHits: 3,
@@ -474,7 +448,7 @@ export const npcMoves = [
     damage: 0,
     description: 'Careful adjustment.  Heals 25 HP; next incoming damage reduced by 10.',
     effect: 'heal_and_reduce_next',
-    healAmount: 35,
+    healAmount: 25,
     reduceAmount: 10,
   },
   
@@ -482,7 +456,7 @@ export const npcMoves = [
   {
     id: 'room_booking_rant',
     name: 'Room Booking Rant',
-    damage: 18,
+    damage: 14,
     description: '50% chance to delay opponent (skip next turn). Everything\'s still broken.',
     effect: 'chance_skip_opponent',
     skipChance: 0.5,
@@ -503,23 +477,23 @@ export const npcMoves = [
     description: 'Chance for player to also receive 30 damage',
     effect: 'chance_mutual_damage_30',
     mutualDamage: 30,
-    mutualChance: 0.5,
+    mutualChance: 0.7,
   },
   {
     id: 'access_denied',
     name: 'Access Denied',
     damage: 0,
     description: 'Rules are rules. Opponent skips their next turn.',
-    effect: 'skip_opponent',
+    effect: 'chance_skip_opponent',
   },
   {
     id: 'colloquium_circuit',
     name: 'Colloquium Circuit',
     damage: 0,
-    description: 'User\'s next two moves deal +20 damage each.',
+    description: 'User\'s next two moves deal +10 damage each.',
     effect: 'boost_sustained',
     boostTurns: 2,
-    boostAmount: 20,
+    boostAmount: 10,
   },
   {
     id: 'silver_lining',
@@ -539,7 +513,7 @@ export const npcMoves = [
   {
     id: 'deep_cut',
     name: 'Deep Cut',
-    damage: 40,
+    damage: 30,
     description: 'A track only the dedicated listener knows. 25% chance opponent\'s next move deals half damage.',
     effect: 'chance_halve_opponent',
     halveChance: 0.25,
@@ -547,9 +521,9 @@ export const npcMoves = [
   {
     id: 'capstone',
     name: 'Capstone',
-    damage: 52,
+    damage: 35,
     description: 'A culmination of years of work.',
-    effect: 'clear_debuff',
+    effect: 'priority',
   },
   {
     id: 'thesis_defense',
@@ -568,9 +542,9 @@ export const npcMoves = [
     skipTurns: 1,
   },
   {
-    id: 'slack_message',
-    name: 'Slack Message',
-    damage: 10,
+    id: '5am_email',
+    name: '5AM Email',
+    damage: 20,
     description: 'Cuts the queue. User acts first next turn.',
     effect: 'priority',
   },
@@ -581,4 +555,11 @@ export const npcMoves = [
     description: 'Redirects approach. Previous technique echoes next turn.',
     effect: 'swap_effect',
   },
+  {
+    id: 'next_token_prediction',
+    name: 'Next Token Prediction',
+    damage: 0,
+    description: 'Randomly guesses the opponents next move, if correct then no damage is taken.',
+    effect: 'cancel_effect',
+  }
 ];

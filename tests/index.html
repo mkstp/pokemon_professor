@@ -25,11 +25,12 @@
     // Import test files first — they register tests by calling test() at load time.
     // Then call renderResults() to display the report.
     import { renderResults } from './runner.js';
-    import './data.test.js';
-    import './engine.test.js';
-    import './battle_scene.test.js';
+    import './engine.tests.js';
+    import './resolver.test.js';
+    import './battle_scene_ui.tests.js';
     import './battle_mode_scene.test.js';
     import './move_kiosk_scene.test.js';
+    import './battle_integration.test.js';
 
     renderResults();
   </script>

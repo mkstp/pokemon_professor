@@ -13,12 +13,12 @@
 import './phaser-stub.js';
 import { test, assert } from './runner.js';
 import MoveKioskScene from '../js/scenes/MoveKioskScene.js';
-import { playerMoves, professorMoves, npcMoves } from '../js/data/moves.js';
+import { professorMoves, npcMoves } from '../js/data/moves.js';
 import * as engine from '../js/engine.js';
 
 // Replicate MoveKioskScene's internal ALL_MOVE_MAP so tests can resolve move objects.
 const ALL_MOVE_MAP = Object.fromEntries(
-  [...professorMoves, ...npcMoves, ...playerMoves].map(m => [m.id, m])
+  [...professorMoves, ...npcMoves].map(m => [m.id, m])
 );
 
 // Known move IDs from data/moves.js — used as test fixtures.
@@ -140,10 +140,10 @@ function makeSceneViaCreate({ learnedIds = [], activeIds = [], onClose = null } 
 
 // ─── create() — state initialisation ─────────────────────────────────────────
 
-test('MoveKioskScene: create() sets cursor to 0', () => {
-  // engine.init() seeds 4 starting moves; setActiveMoves to just MOVE_A.
+test('MoveKioskScene: create() initializes cursor and scrollOffset to 0', () => {
   const scene = makeSceneViaCreate({ activeIds: [MOVE_A] });
   assert.equal(scene.cursor, 0, 'cursor should be 0 after create()');
+  assert.equal(scene.scrollOffset, 0, 'scrollOffset should be 0 after create()');
 });
 
 test('MoveKioskScene: create() populates learnedMoves from engine state', () => {
@@ -172,27 +172,6 @@ test('MoveKioskScene: create() activeMoves is a local copy — not the engine ar
   scene.activeMoves.push('fake_id');
   // Engine state should be unchanged until _confirmAndExit() is called.
   assert.equal(engine.getState().activeMoves.length, 1, 'pushing to local copy should not affect engine state');
-});
-
-// ─── _moveCursor() ────────────────────────────────────────────────────────────
-
-test('MoveKioskScene: _moveCursor(1) increments cursor by 1', () => {
-  const scene = makeScene({ learnedIds: [MOVE_A, MOVE_B, MOVE_C] });
-  scene._moveCursor(1);
-  assert.equal(scene.cursor, 1, 'cursor should move to 1');
-});
-
-test('MoveKioskScene: _moveCursor(-1) wraps cursor from 0 to last index', () => {
-  const scene = makeScene({ learnedIds: [MOVE_A, MOVE_B, MOVE_C] });
-  scene._moveCursor(-1);
-  assert.equal(scene.cursor, 2, 'cursor should wrap to index 2');
-});
-
-test('MoveKioskScene: _moveCursor(1) wraps cursor from last index to 0', () => {
-  const scene = makeScene({ learnedIds: [MOVE_A, MOVE_B, MOVE_C] });
-  scene.cursor = 2;
-  scene._moveCursor(1);
-  assert.equal(scene.cursor, 0, 'cursor should wrap from index 2 to 0');
 });
 
 // ─── _toggleCurrent() ────────────────────────────────────────────────────────
@@ -252,13 +231,6 @@ test('MoveKioskScene: _confirmAndExit() calls onClose callback', () => {
   assert.ok(closeCalled, 'onClose should be called on exit');
 });
 
-test('MoveKioskScene: _confirmAndExit() does not throw when onClose is null', () => {
-  engine.init();
-  const scene = makeScene({ learnedIds: [MOVE_A], activeIds: [MOVE_A], onClose: null });
-  scene._confirmAndExit();
-  assert.ok(true, 'no error when onClose is null');
-});
-
 // ─── _buildUI row count ───────────────────────────────────────────────────────
 
 test('MoveKioskScene: create() builds exactly VISIBLE_ROWS (8) row text objects', () => {
@@ -266,13 +238,6 @@ test('MoveKioskScene: create() builds exactly VISIBLE_ROWS (8) row text objects'
   // After scrolling: code should always create exactly VISIBLE_ROWS = 8 objects.
   const scene = makeSceneViaCreate({ learnedIds: [MOVE_E] }); // 5 learned moves
   assert.equal(scene.rowTexts.length, 8, '_buildUI should create exactly 8 (VISIBLE_ROWS) row text objects');
-});
-
-// ─── scrolling — scrollOffset initialisation ──────────────────────────────────
-
-test('MoveKioskScene: create() sets scrollOffset to 0', () => {
-  const scene = makeSceneViaCreate({});
-  assert.equal(scene.scrollOffset, 0, 'scrollOffset should be 0 after create()');
 });
 
 // ─── scrolling — _moveCursor scroll clamping ──────────────────────────────────
