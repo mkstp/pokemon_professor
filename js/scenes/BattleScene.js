@@ -167,7 +167,7 @@ export default class BattleScene extends Phaser.Scene {
     });
     this.battleState = {
       professor:           prof,
-      player:              makeEntity({ hp: playerHP, maxHP: playerMaxHP, name: 'You' }),
+      player:              makeEntity({ hp: playerHP, maxHP: playerMaxHP, name: 'Player' }),
       opponent:            makeEntity({ hp: prof.hp,  maxHP: prof.hp,     name: prof.name }),
       playerMoves:         activeMoves,
       selectedMoveIndex:   0,
@@ -208,7 +208,7 @@ export default class BattleScene extends Phaser.Scene {
       fontSize: '11px', fill: '#222222', fontFamily: 'monospace',
     });
 
-    this.add.text(PLAYER_HP_LABEL_X, PLAYER_HP_LABEL_Y, 'You', {
+    this.add.text(PLAYER_HP_LABEL_X, PLAYER_HP_LABEL_Y, 'Player', {
       fontSize: '11px', fill: '#222222', fontFamily: 'monospace',
     });
 
@@ -716,7 +716,7 @@ export default class BattleScene extends Phaser.Scene {
   // action menu. Used when the player selects Item with no consumables available.
   _showNoItems() {
     this._setUIMode('log');
-    this.battleLogText.setText('You have no items!');
+    this.battleLogText.setText('Player has no items!');
     this.time.delayedCall(1200, () => {
       this._setUIMode('action');
       this.renderActionMenu();
@@ -809,7 +809,7 @@ export default class BattleScene extends Phaser.Scene {
     const fromHP = engine.getState().playerHP;
     engine.useActiveItem(item.id);
     const toHP = engine.getState().playerHP;
-    text(`You used ${item.name}! ${this._itemEffectMessage(item)}`);
+    text(`Player used ${item.name}! ${this._itemEffectMessage(item)}`);
     if (item.effect.action === 'restore_hp' && toHP !== fromHP) {
       animPl(fromHP, toHP);
     }

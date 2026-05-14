@@ -32,6 +32,8 @@ import { professorMoves, npcMoves } from '../../data/moves.js';
 const PROF_MOVE_MAP = Object.fromEntries(professorMoves.map(m => [m.id, m]));
 const NPC_MOVE_MAP  = Object.fromEntries(npcMoves.map(m => [m.id, m]));
 
+const possessive = name => name === 'Player' ? "Player's" : `${name}'s`;
+
 // ── Unified effects map ───────────────────────────────────────────────────────
 // Effect handlers receive an extended ctx that adds:
 //   self, target      — entity references swapped by the caller
@@ -50,7 +52,7 @@ const effects = {
   },
   halve_next({ target, text }) {
     target.outgoingHalved = true;
-    text(`${target.name}'s next move will deal half damage.`);
+    text(`${possessive(target.name)} next move will deal half damage.`);
   },
   chance_skip_opponent({ target, text, move }) {
     if (Math.random() < (move.skipChance ?? 0.5)) {
@@ -61,7 +63,7 @@ const effects = {
   chance_halve_opponent({ target, text, move }) {
     if (Math.random() < (move.halveChance ?? 0.25)) {
       target.outgoingHalved = true;
-      text(`${target.name}'s next move will deal half damage.`);
+      text(`${possessive(target.name)} next move will deal half damage.`);
     }
   },
 
@@ -124,15 +126,15 @@ const effects = {
   clear_buffs({ target, text }) {
     target.outgoingHalved = false;
     target.reducedNext    = 0;
-    text(`${target.name}'s buffs are stripped away.`);
+    text(`${possessive(target.name)} buffs are stripped away.`);
   },
   nullify_last_buff({ target, text }) {
     target.outgoingHalved = false;
-    text(`${target.name}'s last buff is nullified!`);
+    text(`${possessive(target.name)} last buff is nullified!`);
   },
   reduce_next_10({ target, text, move }) {
     target.reducedNext += (move.reduceAmount ?? 10);
-    text(`${target.name}'s next move is weakened.`);
+    text(`${possessive(target.name)} next move is weakened.`);
   },
   //heals self and reduced next turns impact by a flat amount
   heal_and_reduce_next({ self, target, text, animSelf, move }) {
@@ -140,7 +142,7 @@ const effects = {
     self.hp = Math.min(self.maxHP, self.hp + (move.healAmount ?? 0));
     const gained = self.hp - oldHP;
     target.reducedNext += (move.reduceAmount ?? 10);
-    text(`${self.name} recovers ${gained} HP. ${target.name}'s next move is weakened.`);
+    text(`${self.name} recovers ${gained} HP. ${possessive(target.name)} next move is weakened.`);
     animSelf(oldHP, self.hp);
   },
 
@@ -202,12 +204,16 @@ const effects = {
     } else {
       const usedMove = bs.playerMoves[bs.selectedMoveIndex];
       target.lockedMove = usedMove.id;
-      text(`${self.name} reads your approach — you'll be locked into ${usedMove.name} next turn!`);
+      text(`${self.name} reads the approach — ${target.name} will be locked into ${usedMove.name} next turn!`);
     }
   },
   priority({ self, text }) {
     self.priority = true;
-    text(`${self.name} queues priority — acts first next turn!`);
+    text(`${self.name} will act first next turn!`);
+  },
+  outgoing_bonus({ self, text }) {
+    self.outgoingBonus += 7;
+    text(`${self.name} gets fired up — +7 bonus damage next turn!`);
   },
   swap_effect({ self, text }) {
     self.pendingSwapped = self.lastEffect;
@@ -264,7 +270,7 @@ export function applyDeferredDamage(ctx) {
   const fromHP = player.hp;
   player.hp = Math.max(0, player.hp - dmg);
   bs.opponent.lastDamage = dmg;
-  text(`The deferred effect hits! You take ${dmg} damage.`);
+  text(`The deferred effect hits! Player takes ${dmg} damage.`);
   animPl(fromHP, player.hp);
   engine.setPlayerHP(player.hp);
 
@@ -283,7 +289,7 @@ export function applyPlayerMove(ctx) {
 
   if (player.skippedTurns > 0) {
     player.skippedTurns--;
-    text('You are disrupted and skip your action!');
+    text('Player is disrupted and skips their action!');
     return null;
   }
 
@@ -292,7 +298,7 @@ export function applyPlayerMove(ctx) {
   const move = lockedId
     ? (bs.playerMoves.find(m => m.id === lockedId) ?? bs.playerMoves[bs.selectedMoveIndex])
     : bs.playerMoves[bs.selectedMoveIndex];
-  if (lockedId) text(`You're locked in — forced to use ${move.name}!`);
+  if (lockedId) text(`Player is locked in — forced to use ${move.name}!`);
 
   if (opponent.guessedMove) {
     const guessed = opponent.guessedMove;
@@ -326,7 +332,7 @@ export function applyPlayerMove(ctx) {
 
   const fromOppHP = opponent.hp;
   opponent.hp = Math.max(0, opponent.hp - dmg);
-  text(`You use ${move.name}! Deals ${dmg} damage.`);
+  text(`Player uses ${move.name}! Deals ${dmg} damage.`);
   animP(fromOppHP, opponent.hp);
 
   const extCtx = {
@@ -390,7 +396,7 @@ export function applyOpponentTurn(ctx) {
     const guessed = player.guessedMove;
     player.guessedMove = null;
     if (guessed === oppMoveId) {
-      text(`Prediction correct! ${opponent.name}'s ${oppMove.name} is cancelled!`);
+      text(`Prediction correct! ${possessive(opponent.name)} ${oppMove.name} is cancelled!`);
       engine.setPlayerHP(player.hp);
       return null;
     }
@@ -407,7 +413,7 @@ export function applyOpponentTurn(ctx) {
 
   let dmg = oppMove.damage;
 
-  if (opponent.outgoingHalved)  { dmg = Math.floor(dmg / 2); opponent.outgoingHalved = false; text(`${opponent.name}'s move is weakened!`); }
+  if (opponent.outgoingHalved)  { dmg = Math.floor(dmg / 2); opponent.outgoingHalved = false; text(`${possessive(opponent.name)} move is weakened!`); }
   if (opponent.outgoingDoubled) { dmg *= 2; opponent.outgoingDoubled = false; }
   if (opponent.outgoingBonus > 0){ dmg += opponent.outgoingBonus; opponent.outgoingBonus = 0; }
   if (opponent.boostedTurns > 0){ dmg += opponent.boostedAmount; opponent.boostedTurns--; }
@@ -459,7 +465,7 @@ export function applyOpponentTurn(ctx) {
   engine.setPlayerHP(player.hp);
 
   if (player.hp <= 0) {
-    text('You fainted!');
+    text('Player fainted!');
     return 'loss';
   }
 

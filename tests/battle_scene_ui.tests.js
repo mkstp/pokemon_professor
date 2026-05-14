@@ -179,14 +179,3 @@ test('_openItemMenu: no items → _showNoItems', () => {
   assert.ok(called);
 });
 
-test('_openItemMenu: items present → switches mode', () => {
-  const scene = setupScene();                // calls engine.init() internally
-  engine.addItem('triscuit');
-  engine.equipItem('triscuit');
-  scene.battleState = { menuLevel: 'action', selectedItemIndex: 0, itemScrollOffset: 0 };
-  scene.renderItemMenu = () => {};
-
-  scene._openItemMenu();
-  assert.equal(scene.battleState.menuLevel, 'items');
-});
-

@@ -11,7 +11,7 @@ export const studentNPCs = [
     id: 'student_valentine',
     name: 'Valentine',
     hp: 65,
-    moves: ['whiteboard_spiral', 'non_sequitur', 'hot_take', 'imposter_syndrome'],
+    moves: ['whiteboard_spiral', 'non_sequitur', 'hot_take', 'impostor_syndrome'],
     dialogue: {
       preBattle: 'student_valentine_pre',
       postWin:   'student_valentine_win',

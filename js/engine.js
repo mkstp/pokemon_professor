@@ -17,7 +17,7 @@ const PRE_CASTLE_PROFESSOR_IDS = professors.slice(0, -1).map(p => p.id);
 
 // Starting values used by both init() and resetGame().
 const STARTING_REGION = 'outdoor_campus';
-export const STARTING_HP = 100;
+export const STARTING_HP = 75;
 const STARTING_LEVEL  = 1;
 const STARTING_XP     = 0;
 const XP_PER_LEVEL    = 70;  // XP required to reach each successive level

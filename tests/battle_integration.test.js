@@ -50,7 +50,7 @@ function makeBattleState({ profMoves = ['minimal_pair'], professorHP = 100 } = {
       hp:    professorHP,
       moves: profMoves,
     },
-    player:              makeEntity({ hp: 100, maxHP: 100, name: 'You' }),
+    player:              makeEntity({ hp: 100, maxHP: 100, name: 'Player' }),
     opponent:            makeEntity({ hp: professorHP, maxHP: professorHP, name: 'Prof. Schwaartz' }),
     playerMoves:         [],
     selectedMoveIndex:   0,
@@ -63,7 +63,7 @@ function makeBattleState({ profMoves = ['minimal_pair'], professorHP = 100 } = {
   };
 }
 
-// hot_take: damage 10, effect 'priority' — sets priority flag; no direct HP side effects.
+// hot_take: damage 5, effect 'outgoing_bonus' — grants +10 outgoingBonus to the user next turn.
 const hotTake = npcMoves.find(m => m.id === 'hot_take');
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -115,10 +115,42 @@ test('opponent priority: opponent acts first, player takes damage before dealing
   assert.equal(oppResult, null, 'opponent turn does not end battle');
   assert.equal(bs.player.hp, 87, 'player HP reduced by 13 before player acts');
 
-  // Player acts second: hot_take deals 10 damage.
+  // Player acts second: hot_take deals 5 damage.
   const playerResult = applyPlayerMove(ctx);
   assert.equal(playerResult, null, 'player turn does not end battle');
-  assert.equal(bs.opponent.hp, 40, 'opponent HP reduced by 10 after player acts');
+  assert.equal(bs.opponent.hp, 45, 'opponent HP reduced by 5 after player acts');
+});
+
+test('hot_take: grants +10 outgoingBonus to player for next turn', () => {
+  engine.init();
+  const bs = makeBattleState({ professorHP: 50 });
+  bs.playerMoves       = [hotTake];
+  bs.selectedMoveIndex = 0;
+  const ctx = makeCtx(bs);
+
+  assert.equal(bs.player.outgoingBonus, 0, 'no bonus before move');
+  applyPlayerMove(ctx);
+  assert.equal(bs.player.outgoingBonus, 10, 'player has +10 outgoingBonus after hot_take');
+});
+
+test('hot_take: +10 outgoingBonus is consumed and boosts the following attack', () => {
+  engine.init();
+  const counterexample = npcMoves.find(m => m.id === 'counterexample');
+  const bs = makeBattleState({ professorHP: 100 });
+  bs.playerMoves       = [hotTake];
+  bs.selectedMoveIndex = 0;
+  const ctx = makeCtx(bs);
+
+  applyPlayerMove(ctx);
+  assert.equal(bs.player.outgoingBonus, 10, '+10 bonus queued');
+
+  // Next turn: use a regular move — bonus should be consumed.
+  bs.playerMoves       = [counterexample];
+  bs.selectedMoveIndex = 0;
+  applyPlayerMove(ctx);
+  assert.equal(bs.player.outgoingBonus, 0, 'outgoingBonus consumed');
+  // counterexample base 12 + 10 bonus = 22; opponent started at 95 (100 - 5 from hot_take).
+  assert.equal(bs.opponent.hp, 73, 'next attack deals base + 10 bonus damage');
 });
 
 test('winning a battle then awarding 50 XP triggers level-up when near threshold', () => {
