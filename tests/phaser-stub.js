@@ -19,7 +19,8 @@ globalThis.Phaser = {
   Input: {
     Keyboard: {
       KeyCodes: {
-        UP: 38, DOWN: 40, ENTER: 13, SPACE: 32, ESC: 27, R: 82,
+        UP: 38, DOWN: 40, LEFT: 37, RIGHT: 39,
+        ENTER: 13, SPACE: 32, ESC: 27, TAB: 9, R: 82, I: 73,
       },
     },
   },

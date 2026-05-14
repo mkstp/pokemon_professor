@@ -23,9 +23,11 @@ function mockText() {
 function attachUI(scene) {
   scene.actionTexts   = [mockText(), mockText(), mockText()];
   scene.moveTexts     = [mockText(), mockText(), mockText(), mockText()];
+  scene.moveBackText  = mockText();
   scene.moveDescText  = mockText();
   scene.battleLogText = mockText();
   scene.itemTexts     = [mockText(), mockText(), mockText(), mockText()];
+  scene.itemBackText  = mockText();
   scene.itemDescText  = mockText();
 }
 

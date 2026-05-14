@@ -10,7 +10,7 @@ DATA_FILE="$SCRIPT_DIR/docs/reports/issues-data.js"
 PORT="${1:-8000}"
 
 echo "Generating issues data…"
-JSON=$(cd "$SCRIPT_DIR" && bd list --json 2>/dev/null || echo "[]")
+JSON=$(cd "$SCRIPT_DIR" && bd list --json 2>/dev/null | jq 'map(del(.owner))' || echo "[]")
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 cat > "$DATA_FILE" <<EOF

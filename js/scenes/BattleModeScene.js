@@ -1,42 +1,25 @@
 // BattleModeScene.js — battle mode opponent selector
 //
 // Registered under the key 'OverworldScene' so that BattleScene.endBattle()
-// can wake it without modification. Renders as a three-tab shell:
+// can wake it without modification.
 //
-//   Tab bar (y 0–30): [← Menu] | Opponents | Moves | Items
-//   Content panel (y 30–480): swaps based on active tab
+// Header strip (y 0–30): [← Menu]  |  BATTLE MODE
+// Content panel (y 30–480): paginated opponent list
 //
-// Opponents tab — unified HP-sorted list of all opponents (professors + students)
-// Moves tab    — launches MoveKioskScene as overlay
-// Items tab    — launches ItemKioskScene as overlay
+// Moves/Items configuration is handled by KioskScene (press I).
+// Keyboard: ↑ ↓ navigate  ← → page  Enter battle  ESC back  I menu
 
 import * as engine from '../engine.js';
 import { professors } from '../data/professors.js';
 import { studentNPCs } from '../data/students.js';
 
-// ── Tab bar ──────────────────────────────────────────────────────────────────
-
-const TAB_H      = 30;   // height of the tab bar
-const MENU_BTN_W = 70;   // width reserved for ← Menu button (left-aligned)
-
-// Three equal tabs filling the remaining 330 px after the menu slot
-const TAB_W   = 110;
-const TAB_CENTERS = [
-  MENU_BTN_W + TAB_W * 0 + TAB_W / 2,  // x = 125
-  MENU_BTN_W + TAB_W * 1 + TAB_W / 2,  // x = 235
-  MENU_BTN_W + TAB_W * 2 + TAB_W / 2,  // x = 345
-];
-const TAB_LABELS = ['Opponents', 'Moves', 'Items'];
-const TAB_KEYS   = ['opponents', 'moves', 'items'];
-
-// ── Opponents list layout ─────────────────────────────────────────────────────
-
-const OPP_COL_X      = 200;
-const OPP_BTN_W      = 340;
-const BTN_H          =  34;
-const BTN_Y0         = TAB_H + 54; // first button centre within content panel
-const BTN_GAP        =  44;
-const OPPS_PER_PAGE  =   8;
+const HEADER_H    = 30;
+const OPP_COL_X   = 200;
+const OPP_BTN_W   = 340;
+const BTN_H       =  34;
+const BTN_Y0      = HEADER_H + 54; // first button centre (y = 84)
+const BTN_GAP     =  44;
+const OPPS_PER_PAGE = 8;
 
 export default class BattleModeScene extends Phaser.Scene {
   constructor() {
@@ -44,11 +27,16 @@ export default class BattleModeScene extends Phaser.Scene {
   }
 
   create(data) {
-    this._studPage     = 0;
-    this._activeTab    = 'opponents';
-    this._fromMainMenu = !!(data && data.fromMainMenu);
+    this._studPage      = 0;
+    this._cursor        = 0;
+    this._fromMainMenu  = !!(data && data.fromMainMenu);
     this._pendingUnlock = null;
     engine.init();
+
+    this._allOpponents = [
+      ...professors.map(p => ({ name: p.name, hp: p.hp, tag: 'prof',    id: p.id, opponentType: 'professor' })),
+      ...studentNPCs.map(s => ({ name: s.name, hp: s.hp, tag: 'student', id: s.id, opponentType: 'student'   })),
+    ].sort((a, b) => a.hp - b.hp);
 
     if (!this._fromMainMenu) {
       this.scene.launch('AudioScene');
@@ -66,11 +54,12 @@ export default class BattleModeScene extends Phaser.Scene {
     }
 
     this._buildUI();
+    this._initKeyboard();
   }
 
   wake() {
-    this._studPage  = 0;
-    this._activeTab = 'opponents';
+    this._studPage = 0;
+    this._cursor   = 0;
     engine.init();
     const audio = this.scene.get('AudioScene');
     if (audio) {
@@ -82,106 +71,53 @@ export default class BattleModeScene extends Phaser.Scene {
 
   _buildUI() {
     this.children.removeAll(true);
-
-    // Full background
     this.add.rectangle(200, 240, 400, 480, 0x1a1a2e);
-
-    this._buildTabBar();
-    this._buildTabContent();
+    this._buildHeader();
+    this._buildContent();
   }
 
-  // ── Tab bar ────────────────────────────────────────────────────────────────
+  // ── Header ────────────────────────────────────────────────────────────────
 
-  _buildTabBar() {
-    // Tab bar background strip
-    this.add.rectangle(200, TAB_H / 2, 400, TAB_H, 0x0e0e1f);
+  _buildHeader() {
+    this.add.rectangle(200, HEADER_H / 2, 400, HEADER_H, 0x0e0e1f);
 
-    // ← Menu button — always in the tab bar row when entered from main menu
     if (this._fromMainMenu) {
-      const bg = this.add.rectangle(MENU_BTN_W / 2, TAB_H / 2, MENU_BTN_W, TAB_H, 0x2a2a4a)
+      const menuBtnW = 70;
+      const bg = this.add.rectangle(menuBtnW / 2, HEADER_H / 2, menuBtnW, HEADER_H, 0x2a2a4a)
         .setInteractive({ useHandCursor: true });
-      this.add.text(MENU_BTN_W / 2, TAB_H / 2, '← Menu', {
+      this.add.text(menuBtnW / 2, HEADER_H / 2, '← Menu', {
         fontSize: '11px', color: '#ccccff', fontFamily: 'monospace',
       }).setOrigin(0.5);
       bg.on('pointerover',  () => bg.setFillStyle(0x3a3a6a));
       bg.on('pointerout',   () => bg.setFillStyle(0x2a2a4a));
-      bg.on('pointerdown',  () => {
-        this.scene.sleep('OverworldScene');
-        this.scene.wake('MainMenuScene');
-      });
+      bg.on('pointerdown',  () => this._goBack());
     }
 
-    // Three tab buttons
-    TAB_KEYS.forEach((key, i) => {
-      const isActive = this._activeTab === key;
-      const x        = TAB_CENTERS[i];
-      const bgColor  = isActive ? 0x3a3a6a : 0x1e1e38;
-      const txtColor = isActive ? '#ffffff' : '#8888aa';
+    this.add.text(200, HEADER_H / 2, 'BATTLE MODE', {
+      fontSize: '11px', color: '#8888aa', fontFamily: 'monospace',
+    }).setOrigin(0.5);
 
-      const bg = this.add.rectangle(x, TAB_H / 2, TAB_W, TAB_H, bgColor)
-        .setInteractive({ useHandCursor: true });
-
-      this.add.text(x, TAB_H / 2, TAB_LABELS[i], {
-        fontSize: '11px', color: txtColor, fontFamily: 'monospace',
-      }).setOrigin(0.5);
-
-      // Active-tab underline
-      if (isActive) {
-        this.add.rectangle(x, TAB_H - 2, TAB_W, 2, 0x6666ff);
-      }
-
-      bg.on('pointerover', () => { if (!isActive) bg.setFillStyle(0x2a2a4a); });
-      bg.on('pointerout',  () => { if (!isActive) bg.setFillStyle(0x1e1e38); });
-      bg.on('pointerdown', () => {
-        if (key === 'moves') {
-          this.scene.launch('MoveKioskScene', {});
-          return;
-        }
-        if (key === 'items') {
-          this.scene.launch('ItemKioskScene', {});
-          return;
-        }
-        if (this._activeTab !== key) {
-          this._activeTab = key;
-          this._studPage  = 0;
-          this._buildUI();
-        }
-      });
-    });
-
-    // Separator line below tab bar
-    this.add.rectangle(200, TAB_H, 400, 1, 0x333355);
+    this.add.rectangle(200, HEADER_H, 400, 1, 0x333355);
   }
 
-  // ── Tab content dispatcher ─────────────────────────────────────────────────
+  // ── Content ───────────────────────────────────────────────────────────────
 
-  _buildTabContent() {
-    if (this._activeTab === 'opponents') { this._buildOpponentsTab(); return; }
-    if (this._activeTab === 'moves')     { this._buildMovesTab();     return; }
-    if (this._activeTab === 'items')     { this._buildItemsTab();     return; }
-  }
-
-  // ── Opponents tab ──────────────────────────────────────────────────────────
-
-  _buildOpponentsTab() {
-    // Unified HP-sorted list of all opponents
-    const allOpponents = [
-      ...professors.map(p => ({ name: p.name, hp: p.hp, tag: 'prof',    id: p.id, opponentType: 'professor' })),
-      ...studentNPCs.map(s => ({ name: s.name, hp: s.hp, tag: 'student', id: s.id, opponentType: 'student'   })),
-    ].sort((a, b) => a.hp - b.hp);
-
-    const totalPages = Math.ceil(allOpponents.length / OPPS_PER_PAGE);
+  _buildContent() {
+    const totalPages = Math.ceil(this._allOpponents.length / OPPS_PER_PAGE);
     const pageStart  = this._studPage * OPPS_PER_PAGE;
-    const pageSlice  = allOpponents.slice(pageStart, pageStart + OPPS_PER_PAGE);
+    const pageSlice  = this._allOpponents.slice(pageStart, pageStart + OPPS_PER_PAGE);
 
-    this.add.text(200, TAB_H + 16, 'select opponent to battle', {
+    this._cursor = Math.min(this._cursor, pageSlice.length - 1);
+
+    this.add.text(200, HEADER_H + 16, 'select opponent to battle', {
       fontSize: '10px', color: '#666688', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
     pageSlice.forEach((opp, i) => {
       const rank = pageStart + i + 1;
       const y    = BTN_Y0 + i * BTN_GAP;
-      this._makeButton(OPP_COL_X, y, OPP_BTN_W, BTN_H,
+      this._makeButton(
+        OPP_COL_X, y, OPP_BTN_W, BTN_H,
         opp.name,
         `${opp.tag}  —  ${opp.hp} HP`,
         `#${rank}`,
@@ -189,51 +125,104 @@ export default class BattleModeScene extends Phaser.Scene {
           opp.opponentType === 'professor'
             ? { opponentType: 'professor', professorId: opp.id }
             : { opponentType: 'student',   studentId:   opp.id }
-        )
+        ),
+        i === this._cursor
       );
     });
 
-    const PAGE_Y = 462;
+    const PAGE_Y = 448;
     this.add.text(200, PAGE_Y, `${this._studPage + 1} / ${totalPages}`, {
       fontSize: '11px', color: '#8888aa', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
     if (this._studPage > 0) {
-      this._makeNavButton(200 - 60, PAGE_Y, 'Prev',
-        () => { this._studPage -= 1; this._buildUI(); });
+      this._makeNavButton(200 - 60, PAGE_Y, '← Prev',
+        () => { this._studPage -= 1; this._cursor = 0; this._buildUI(); });
     }
     if (this._studPage < totalPages - 1) {
-      this._makeNavButton(200 + 60, PAGE_Y, 'Next',
-        () => { this._studPage += 1; this._buildUI(); });
+      this._makeNavButton(200 + 60, PAGE_Y, 'Next →',
+        () => { this._studPage += 1; this._cursor = 0; this._buildUI(); });
     }
-  }
 
-  // ── Moves tab (placeholder — implemented in test_project-zt8) ─────────────
-
-  _buildMovesTab() {
-    this.add.text(200, 255, 'Move Kiosk', {
-      fontSize: '14px', color: '#aaaacc', fontFamily: 'monospace',
-    }).setOrigin(0.5);
-    this.add.text(200, 280, 'coming soon', {
-      fontSize: '11px', color: '#555577', fontFamily: 'monospace',
+    this.add.text(200, 470, '↑ ↓: navigate  ← →: page  Enter: battle  I: menu', {
+      fontSize: '9px', color: '#444466', fontFamily: 'monospace',
     }).setOrigin(0.5);
   }
 
-  // ── Items tab (placeholder — implemented in test_project-dlo) ─────────────
+  // ── Keyboard ──────────────────────────────────────────────────────────────
 
-  _buildItemsTab() {
-    this.add.text(200, 255, 'Item Kiosk', {
-      fontSize: '14px', color: '#aaaacc', fontFamily: 'monospace',
-    }).setOrigin(0.5);
-    this.add.text(200, 280, 'coming soon', {
-      fontSize: '11px', color: '#555577', fontFamily: 'monospace',
-    }).setOrigin(0.5);
+  _initKeyboard() {
+    const keys = this.input.keyboard.addKeys({
+      up:    Phaser.Input.Keyboard.KeyCodes.UP,
+      down:  Phaser.Input.Keyboard.KeyCodes.DOWN,
+      left:  Phaser.Input.Keyboard.KeyCodes.LEFT,
+      right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      enter: Phaser.Input.Keyboard.KeyCodes.ENTER,
+      space: Phaser.Input.Keyboard.KeyCodes.SPACE,
+      esc:   Phaser.Input.Keyboard.KeyCodes.ESC,
+    });
+
+    const totalPages = () => Math.ceil(this._allOpponents.length / OPPS_PER_PAGE);
+    const pageSlice  = () => this._allOpponents.slice(
+      this._studPage * OPPS_PER_PAGE,
+      this._studPage * OPPS_PER_PAGE + OPPS_PER_PAGE
+    );
+
+    keys.up.on('down', () => {
+      const len = pageSlice().length;
+      this._cursor = (this._cursor - 1 + len) % len;
+      this._buildUI();
+    });
+
+    keys.down.on('down', () => {
+      this._cursor = (this._cursor + 1) % pageSlice().length;
+      this._buildUI();
+    });
+
+    keys.left.on('down', () => {
+      if (this._studPage > 0) {
+        this._studPage -= 1;
+        this._cursor    = 0;
+        this._buildUI();
+      }
+    });
+
+    keys.right.on('down', () => {
+      if (this._studPage < totalPages() - 1) {
+        this._studPage += 1;
+        this._cursor    = 0;
+        this._buildUI();
+      }
+    });
+
+    const confirm = () => {
+      const opp = pageSlice()[this._cursor];
+      if (!opp) return;
+      this._startBattle(
+        opp.opponentType === 'professor'
+          ? { opponentType: 'professor', professorId: opp.id }
+          : { opponentType: 'student',   studentId:   opp.id }
+      );
+    };
+    keys.enter.on('down', confirm);
+    keys.space.on('down', confirm);
+
+    keys.esc.on('down', () => this._goBack());
+
+    this.input.keyboard.on('keydown-I', () => this._openKiosk('moves'));
   }
 
-  // ── Shared button helpers ──────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
-  _makeButton(x, y, w, h, title, subtitle, indexLabel, onClick) {
-    const bg = this.add.rectangle(x, y, w, h, 0x2a2a4a)
+  _goBack() {
+    if (!this._fromMainMenu) return;
+    this.scene.sleep('OverworldScene');
+    this.scene.wake('MainMenuScene');
+  }
+
+  _makeButton(x, y, w, h, title, subtitle, indexLabel, onClick, isSelected = false) {
+    const baseFill = isSelected ? 0x3a3a6a : 0x2a2a4a;
+    const bg = this.add.rectangle(x, y, w, h, baseFill)
       .setInteractive({ useHandCursor: true });
 
     this.add.text(x - w / 2 + 8, y - 8, title, {
@@ -249,14 +238,12 @@ export default class BattleModeScene extends Phaser.Scene {
     }).setOrigin(1, 0.5);
 
     bg.on('pointerover',  () => bg.setFillStyle(0x3a3a6a));
-    bg.on('pointerout',   () => bg.setFillStyle(0x2a2a4a));
+    bg.on('pointerout',   () => bg.setFillStyle(baseFill));
     bg.on('pointerdown',  onClick);
   }
 
   _makeNavButton(x, y, label, onClick) {
-    const w  = 76;
-    const h  = BTN_H;
-    const bg = this.add.rectangle(x, y, w, h, 0x2a2a4a)
+    const bg = this.add.rectangle(x, y, 76, BTN_H, 0x2a2a4a)
       .setInteractive({ useHandCursor: true });
 
     this.add.text(x, y, label, {
@@ -268,7 +255,14 @@ export default class BattleModeScene extends Phaser.Scene {
     bg.on('pointerdown',  onClick);
   }
 
-  // ── Battle launch ──────────────────────────────────────────────────────────
+  _openKiosk(startTab) {
+    this.input.keyboard.enabled = false;
+    this.scene.launch('KioskScene', {
+      mode: 'battle',
+      startTab: startTab || 'moves',
+      onClose: () => { this.input.keyboard.enabled = true; },
+    });
+  }
 
   _startBattle(data) {
     if (this._pendingUnlock) {

@@ -248,7 +248,7 @@ export const npcMoves = [
   {
     id: 'hot_take',
     name: 'Hot Take',
-    damage: 5,
+    damage: 10,
     description: 'Sharp and immediate. Acts first next turn — or deals +10 bonus damage if already going first.',
     effect: 'priority',
   },

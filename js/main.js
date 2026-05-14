@@ -7,7 +7,7 @@ import OverworldScene    from './scenes/OverworldScene.js';
 import BattleScene       from './scenes/BattleScene.js';
 import DialogueScene     from './scenes/DialogueScene.js';
 import AudioScene        from './scenes/AudioScene.js';
-import MoveKioskScene    from './scenes/MoveKioskScene.js';
+import KioskScene        from './scenes/KioskScene.js';
 
 const config = {
   type:            Phaser.AUTO,   // WebGL if available, Canvas fallback
@@ -21,7 +21,7 @@ const config = {
     BattleScene,
     DialogueScene,
     AudioScene,
-    MoveKioskScene,
+    KioskScene,
   ],
   physics: {
     default: 'arcade',

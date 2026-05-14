@@ -239,6 +239,11 @@ export default class BattleScene extends Phaser.Scene {
     );
     this.moveTexts.forEach(t => t.setVisible(false));
 
+    // Back entry at the bottom of the move list — selecting it returns to action menu.
+    this.moveBackText = this.add.text(MOVE_X, MOVE_Y_BASE + activeMoves.length * MOVE_STEP, '', {
+      fontSize: '13px', fill: '#222266', fontFamily: 'monospace',
+    }).setVisible(false);
+
     // --- Move description: shown in the right half of the UI panel when the
     // move submenu is open. Updates dynamically as the cursor moves.
     this.moveDescText = this.add.text(205, MOVE_Y_BASE, '', {
@@ -253,6 +258,11 @@ export default class BattleScene extends Phaser.Scene {
         fontSize: '13px', fill: '#222266', fontFamily: 'monospace',
       }).setVisible(false)
     );
+
+    // Back entry below the four scrollable item slots — fixed position, not part of scroll.
+    this.itemBackText = this.add.text(MOVE_X, MOVE_Y_BASE + 4 * MOVE_STEP, '', {
+      fontSize: '13px', fill: '#222266', fontFamily: 'monospace',
+    }).setVisible(false);
 
     // --- Item description: shown in the right panel when the item submenu is open.
     this.itemDescText = this.add.text(205, MOVE_Y_BASE, '', {
@@ -296,7 +306,8 @@ export default class BattleScene extends Phaser.Scene {
           this.renderItemMenu();
         }
       } else {
-        const len = this.battleState.playerMoves.length;
+        // +1 to include Back as the last navigable slot (wraps around).
+        const len = this.battleState.playerMoves.length + 1;
         this.battleState.selectedMoveIndex =
           (this.battleState.selectedMoveIndex - 1 + len) % len;
         this.renderMoveMenu();
@@ -311,15 +322,19 @@ export default class BattleScene extends Phaser.Scene {
         this.renderActionMenu();
       } else if (this.battleState.menuLevel === 'items') {
         const activeItems = engine.getActiveItems();
-        if (this.battleState.selectedItemIndex < activeItems.length - 1) {
+        // Allow one extra step to reach the fixed Back entry (activeItems.length).
+        if (this.battleState.selectedItemIndex < activeItems.length) {
           this.battleState.selectedItemIndex++;
-          if (this.battleState.selectedItemIndex >= this.battleState.itemScrollOffset + 4) {
+          // Only scroll when moving within the scrollable list, not onto Back.
+          if (this.battleState.selectedItemIndex < activeItems.length &&
+              this.battleState.selectedItemIndex >= this.battleState.itemScrollOffset + 4) {
             this.battleState.itemScrollOffset++;
           }
           this.renderItemMenu();
         }
       } else {
-        const len = this.battleState.playerMoves.length;
+        // +1 to include Back as the last navigable slot (wraps around).
+        const len = this.battleState.playerMoves.length + 1;
         this.battleState.selectedMoveIndex =
           (this.battleState.selectedMoveIndex + 1) % len;
         this.renderMoveMenu();
@@ -352,9 +367,21 @@ export default class BattleScene extends Phaser.Scene {
           this._openItemMenu();
         }
       } else if (this.battleState.menuLevel === 'moves') {
-        this.selectMove(this.battleState.selectedMoveIndex);
+        if (this.battleState.selectedMoveIndex === this.battleState.playerMoves.length) {
+          this.battleState.menuLevel = 'action';
+          this._setUIMode('action');
+          this.renderActionMenu();
+        } else {
+          this.selectMove(this.battleState.selectedMoveIndex);
+        }
       } else if (this.battleState.menuLevel === 'items') {
-        this._confirmItemUse();
+        if (this.battleState.selectedItemIndex === engine.getActiveItems().length) {
+          this.battleState.menuLevel = 'action';
+          this._setUIMode('action');
+          this.renderActionMenu();
+        } else {
+          this._confirmItemUse();
+        }
       }
     };
     keys.enter.on('down', confirmMove);
@@ -564,20 +591,24 @@ export default class BattleScene extends Phaser.Scene {
     });
   }
 
-  // Updates the four move Text objects to reflect the current selection,
+  // Updates move Text objects and the Back entry to reflect the current selection,
   // and refreshes the move description shown in the right panel column.
   renderMoveMenu() {
+    const len = this.battleState.playerMoves.length;
     this.battleState.playerMoves.forEach((move, i) => {
       const cursor = i === this.battleState.selectedMoveIndex ? '> ' : '  ';
       this.moveTexts[i].setText(`${cursor}${move.name}`);
     });
+    const backCursor = this.battleState.selectedMoveIndex === len ? '> ' : '  ';
+    this.moveBackText.setText(`${backCursor}Back`);
     this._updateMoveDesc();
   }
 
   // Sets moveDescText to the description of the currently highlighted move.
+  // Clears the description when the Back entry is selected.
   _updateMoveDesc() {
     const move = this.battleState.playerMoves[this.battleState.selectedMoveIndex];
-    this.moveDescText.setText(move.description);
+    this.moveDescText.setText(move ? move.description : '');
   }
 
   // ─── UI mode ──────────────────────────────────────────────────────────────
@@ -594,9 +625,11 @@ export default class BattleScene extends Phaser.Scene {
     const showItems  = mode === 'items';
     this.actionTexts.forEach(t => t.setVisible(showAction));
     this.moveTexts.forEach(t => t.setVisible(showMoves));
+    this.moveBackText.setVisible(showMoves);
     this.moveDescText.setVisible(showMoves);
     this.battleLogText.setVisible(showLog);
     this.itemTexts.forEach(t => t.setVisible(showItems));
+    this.itemBackText.setVisible(showItems);
     this.itemDescText.setVisible(showItems);
   }
 
@@ -706,6 +739,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // Renders up to 4 item entries with cursor, respecting the current scroll offset.
+  // A fixed Back entry sits below the scrollable list.
   // The right panel shows the flavourText of the highlighted item (or its name if none).
   renderItemMenu() {
     const activeItems = engine.getActiveItems();
@@ -723,8 +757,15 @@ export default class BattleScene extends Phaser.Scene {
       }
     }
 
-    const itemDef = items.find(it => it.id === activeItems[selected]);
-    this.itemDescText.setText(itemDef.flavourText ?? itemDef.name);
+    const backCursor = selected === activeItems.length ? '> ' : '  ';
+    this.itemBackText.setText(`${backCursor}Back`);
+
+    if (selected < activeItems.length) {
+      const itemDef = items.find(it => it.id === activeItems[selected]);
+      this.itemDescText.setText(itemDef.flavourText ?? itemDef.name);
+    } else {
+      this.itemDescText.setText('');
+    }
   }
 
   // Called when the player confirms item selection in the items submenu.

@@ -29,7 +29,7 @@ The configuration object passed to `new Phaser.Game(config)`:
     DialogueScene,
     AudioScene,
     BattleModeScene,           // debug/dev selector for launching professor or student NPC battles
-    MoveKioskScene,            // move loadout management UI (launched as overlay from BattleScene pre-battle)
+    KioskScene,                // unified player menu (moves · items · collection); opened with I key
   ],
   physics: {
     default: 'arcade',

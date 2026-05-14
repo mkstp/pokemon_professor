@@ -7,7 +7,7 @@
 
 ## Responsibility
 
-Renders the tile-based campus map and handles all overworld gameplay: player movement, encounter trigger detection, region transitions, ambient NPC interactions, and item kiosk access. Delegates weather effects to `visuals.js`. Transitions to `BattleScene` on professor encounter; launches `DialogueScene` for overworld dialogue and ambient NPC interactions; launches `MoveKioskScene` for move loadout management.
+Renders the tile-based campus map and handles all overworld gameplay: player movement, encounter trigger detection, region transitions, ambient NPC interactions, and player menu access. Delegates weather effects to `visuals.js`. Transitions to `BattleScene` on professor encounter; launches `DialogueScene` for overworld dialogue and ambient NPC interactions; launches `KioskScene` for move/item/collection management.
 
 ---
 
@@ -80,9 +80,11 @@ None. Scene-level references (player sprite, active tilemap layers, weather emit
 
 ---
 
-### Move Kiosk Access
+### Player Menu Access
 
-The move kiosk is accessible from a designated tile in the overworld (e.g. a notice board or locker). When the player steps on or interacts with the kiosk tile, `MoveKioskScene` is launched as an overlay. On exit, the overworld resumes with the updated active move loadout from engine state.
+The player menu (`KioskScene`) is accessible at any time in the overworld by pressing `I`. It opens as an overlay with three tabs — MOVES, ITEMS, COLLECTION — cycled with TAB. In overworld mode, only items the player has collected are shown in the ITEMS tab; MOVES and COLLECTION are always available. On exit (ESC or I), both the move loadout and item loadout are saved to engine state and the overworld resumes.
+
+Init params: `{ mode: 'overworld', onClose }`. The overworld disables its own input while the menu is open and re-enables it in `onClose`.
 
 ---
 
@@ -97,5 +99,5 @@ The move kiosk is accessible from a designated tile in the overworld (e.g. a not
 - `main.js` — registered as `'OverworldScene'`; first scene started on game launch
 - `BattleScene` — started via `this.scene.start('BattleScene', { opponentType, opponentId })` after pre-battle dialogue completes
 - `DialogueScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })` for pre/post-encounter dialogue and ambient NPC interactions
-- `MoveKioskScene` — launched as overlay when player accesses the move kiosk tile
+- `KioskScene` — launched as overlay when player presses I in the overworld
 - `AudioScene` — accessed via `this.scene.get('AudioScene').switchTo(trackId)`

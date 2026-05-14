@@ -63,7 +63,7 @@ function makeBattleState({ profMoves = ['minimal_pair'], professorHP = 100 } = {
   };
 }
 
-// hot_take: damage 10, effect 'clear_debuff' — simple, no side effects on HP.
+// hot_take: damage 10, effect 'priority' — sets priority flag; no direct HP side effects.
 const hotTake = npcMoves.find(m => m.id === 'hot_take');
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

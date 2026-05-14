@@ -50,7 +50,7 @@ export const items = [
   {
     id: 'kombucha',
     name: 'Kombucha',
-    flavourText: 'where I\'m from this makes you hallucinate',
+    flavourText: 'it\'s supposed to make you hallucinate',
     category: 'consumable',
     effect: { action: 'restore_hp', value: 7 },
     source: null,
@@ -165,9 +165,9 @@ export const items = [
     repeatableSource: false,
   },
   {
-    id: 'annies_tacos',
-    name: 'Annie\'s Tacos',
-    flavourText: 'the best',
+    id: 'train_station_tacos',
+    name: 'Train Station Tacos',
+    flavourText: 'the fish taco is the best',
     category: 'consumable',
     effect: { action: 'restore_hp', value: 30 },
     source: null,
@@ -298,6 +298,15 @@ export const items = [
     effect: { action: 'boost_exp', value: 15 },
     source: null,
     repeatableSource: true,
+  },
+  {
+    id: 'gaslight_cheeseburger',
+    name: 'Gaslight Cheesebuger',
+    flavourText: 'there\'s cheese in it, it\'s just really spread out and mixed in with the mustard',
+    category: 'consumable',
+    effect: { action: 'restore_hp', value: 30 },
+    source: null,
+    repeatableSource: false,
   },
 
   // ── Key Items ─────────────────────────────────────────────────────────────

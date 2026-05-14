@@ -18,7 +18,7 @@ The data layer is split into domain files for LLM-context efficiency. Each file 
 | File | Exports | Consumed by |
 |------|---------|-------------|
 | `professors.js` | `professors` | `BattleScene`, `BattleModeScene`, `engine` |
-| `moves.js` | `playerMoves`, `professorMoves`, `npcMoves` | `BattleScene`, `MoveKioskScene`, `engine` |
+| `moves.js` | `playerMoves`, `professorMoves`, `npcMoves` | `BattleScene`, `KioskScene`, `engine` |
 | `students.js` | `studentNPCs` | `BattleScene`, `BattleModeScene` |
 | `ambientNpcs.js` | `ambientNPCs` | `OverworldScene` |
 | `items.js` | `items` | `BattleScene`, `engine`, overworld item interactions |

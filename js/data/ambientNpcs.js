@@ -11,30 +11,6 @@
 
 export const ambientNPCs = [
   {
-    id: 'npc_casey',
-    name: 'Casey',
-    location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: 'npc_casey',
-    reward: 'meal_lovers_badge', //once you've aquired all food items at least once
-    repeatableReward: false,
-  },
-  {
-    id: 'npc_antaeus',
-    name: 'Antaeus',
-    location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: 'npc_antaeus',
-    reward: 'meaningful_spaghetti',
-    repeatableReward: true,
-  },
-  {
-    id: 'npc_clara',
-    name: 'Clara',
-    location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: 'npc_clara',
-    reward: 'triscuit',
-    repeatableReward: true,
-  },
-  {
     id: 'npc_beckett',
     name: 'Beckett',
     location: { region: 'tbd', tile: { x: 0, y: 0 } },
@@ -49,14 +25,6 @@ export const ambientNPCs = [
     dialogue: 'npc_emeryn',
     reward: 'purim_cookie',
     repeatableReward: true,
-  },
-  {
-    id: 'npc_kyle',
-    name: 'Kyle',
-    location: { region: 'tbd', tile: { x: 0, y: 0 } },
-    dialogue: 'npc_kyle',
-    reward: 'carls_large_cheese_steak_sub',
-    repeatableReward: false,
   },
   {
     id: 'npc_ruby',

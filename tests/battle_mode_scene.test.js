@@ -23,8 +23,13 @@ const LAST_PAGE      = Math.ceil(TOTAL_OPPS / OPPS_PER_PAGE) - 1;
 function makeScene() {
   const scene = Object.create(BattleModeScene.prototype);
 
-  scene._studPage  = 0;
-  scene._activeTab = 'opponents';
+  scene._studPage = 0;
+  scene._cursor   = 0;
+
+  scene._allOpponents = [
+    ...professors.map(p => ({ name: p.name, hp: p.hp, tag: 'prof',    id: p.id, opponentType: 'professor' })),
+    ...studentNPCs.map(s => ({ name: s.name, hp: s.hp, tag: 'student', id: s.id, opponentType: 'student'   })),
+  ].sort((a, b) => a.hp - b.hp);
 
   // Track calls to _makeButton and _makeNavButton.
   scene._buttonCalls    = [];
@@ -99,8 +104,8 @@ test('BattleModeScene: page 0 shows Next but not Prev', () => {
   scene._studPage = 0;
   scene._buildUI();
 
-  assert.equal(scene._navButtonCalls.filter(c => c.label === 'Prev').length, 0, 'Prev should not appear on page 0');
-  assert.equal(scene._navButtonCalls.filter(c => c.label === 'Next').length, 1, 'Next should appear on page 0');
+  assert.equal(scene._navButtonCalls.filter(c => c.label === '← Prev').length, 0, 'Prev should not appear on page 0');
+  assert.equal(scene._navButtonCalls.filter(c => c.label === 'Next →').length, 1, 'Next should appear on page 0');
 });
 
 test('BattleModeScene: last page shows Prev but not Next', () => {
@@ -108,8 +113,8 @@ test('BattleModeScene: last page shows Prev but not Next', () => {
   scene._studPage = LAST_PAGE;
   scene._buildUI();
 
-  assert.equal(scene._navButtonCalls.filter(c => c.label === 'Prev').length, 1, 'Prev should appear on last page');
-  assert.equal(scene._navButtonCalls.filter(c => c.label === 'Next').length, 0, 'Next should not appear on last page');
+  assert.equal(scene._navButtonCalls.filter(c => c.label === '← Prev').length, 1, 'Prev should appear on last page');
+  assert.equal(scene._navButtonCalls.filter(c => c.label === 'Next →').length, 0, 'Next should not appear on last page');
 });
 
 // ─── Page navigation callbacks ────────────────────────────────────────────────
@@ -122,7 +127,7 @@ test('BattleModeScene: clicking Next increments _studPage and rebuilds UI', () =
   const origMakeNavButton = scene._makeNavButton.bind(scene);
   scene._makeNavButton = function(x, y, label, onClick) {
     origMakeNavButton(x, y, label, onClick);
-    if (label === 'Next') nextClick = onClick;
+    if (label === 'Next →') nextClick = onClick;
   };
 
   scene._buildUI();
@@ -148,7 +153,7 @@ test('BattleModeScene: clicking Prev decrements _studPage and rebuilds UI', () =
   const origMakeNavButton = scene._makeNavButton.bind(scene);
   scene._makeNavButton = function(x, y, label, onClick) {
     origMakeNavButton(x, y, label, onClick);
-    if (label === 'Prev') prevClick = onClick;
+    if (label === '← Prev') prevClick = onClick;
   };
 
   scene._buildUI();
