@@ -96,6 +96,7 @@ export default class BattleScene extends Phaser.Scene {
   init(data) {
     this.opponentType = data.opponentType ?? 'professor';
     this.opponentId   = data.professorId  ?? data.studentId;
+    this.returnScene  = data.returnScene  ?? 'OverworldScene';
   }
 
   // Loads battle sprites. Skips the load if Phaser already cached the texture.
@@ -517,23 +518,25 @@ export default class BattleScene extends Phaser.Scene {
     const audio = this.scene.get('AudioScene');
 
     if (this.battleState.outcome === 'win' && this.opponentType === 'professor') {
-      // Professor win: play post-battle dialogue before returning to the overworld.
+      // Professor win: play post-battle dialogue, then return to caller.
+      // Only switch to overworld music when returning to OverworldScene;
+      // if returning to BattleModeScene, let its wake() handle audio.
       const sequenceKey = this.battleState.professor.dialogue.postWin;
       this.scene.launch('DialogueScene', {
         sequenceKey,
         onComplete: () => {
-          audio.switchTo('overworld');
+          if (this.returnScene === 'OverworldScene') audio.switchTo('overworld');
+          else audio.stop();
           this.scene.stop('BattleScene');
-          this.scene.wake('OverworldScene');
+          this.scene.wake(this.returnScene);
         },
       });
     } else {
-      // Student NPC battle end: stop battle music and return to the battle mode selector.
-      // BattleModeScene.wake() is responsible for starting intro_credits.
-      // Do not call switchTo('overworld') here — the battle mode selector is not the overworld.
+      // All other outcomes: stop music and return to caller.
+      // The receiving scene's wake() is responsible for starting its own track.
       audio.stop();
       this.scene.stop('BattleScene');
-      this.scene.wake('OverworldScene');
+      this.scene.wake(this.returnScene);
     }
   }
 

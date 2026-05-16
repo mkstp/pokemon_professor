@@ -6,40 +6,11 @@
   <title>Pokemon Professor</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0f0f1a; display: flex; justify-content: center; align-items: flex-start; padding-top: 20px; min-height: 100vh; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0f0f1a; }
   </style>
 </head>
 <body>
   <script src="vendor/phaser.min.js"></script>
-  <script type="module">
-    import MainMenuScene    from './js/scenes/MainMenuScene.js';
-    import BattleModeScene  from './js/scenes/BattleModeScene.js';
-    import BattleScene      from './js/scenes/BattleScene.js';
-    import DialogueScene    from './js/scenes/DialogueScene.js';
-    import AudioScene       from './js/scenes/AudioScene.js';
-    import KioskScene       from './js/scenes/KioskScene.js';
-
-    new Phaser.Game({
-      type:            Phaser.AUTO,
-      width:           400,
-      height:          480,
-      backgroundColor: '#0f0f1a',
-      pixelArt:        true,
-      scene: [
-        // MainMenuScene auto-starts first; Battle Mode runs in the same instance
-        // so AudioScene — and intro_credits — remain uninterrupted during navigation.
-        MainMenuScene,
-        BattleModeScene,
-        BattleScene,
-        DialogueScene,
-        AudioScene,
-        KioskScene,
-      ],
-      physics: {
-        default: 'arcade',
-        arcade:  { gravity: { y: 0 }, debug: false },
-      },
-    });
-  </script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>

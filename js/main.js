@@ -5,20 +5,28 @@
 
 import OverworldScene    from './scenes/OverworldScene.js';
 import BattleScene       from './scenes/BattleScene.js';
+import BattleModeScene   from './scenes/BattleModeScene.js';
 import DialogueScene     from './scenes/DialogueScene.js';
 import AudioScene        from './scenes/AudioScene.js';
 import KioskScene        from './scenes/KioskScene.js';
+import MainMenuScene     from './scenes/MainMenuScene.js';
 
 const config = {
   type:            Phaser.AUTO,   // WebGL if available, Canvas fallback
   width:           400,
   height:          400,
-  backgroundColor: '#000000',
+  backgroundColor: '#0f0f1a',
   pixelArt:        true,          // nearest-neighbour filtering; prevents dark fringe on scaled sprites
+  scale: {
+    mode:       Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
   scene: [
-    // OverworldScene auto-starts first; it launches AudioScene and other scenes.
+    // MainMenuScene auto-starts first; all other scenes are launched from there.
+    MainMenuScene,
     OverworldScene,
     BattleScene,
+    BattleModeScene,
     DialogueScene,
     AudioScene,
     KioskScene,

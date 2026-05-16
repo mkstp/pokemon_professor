@@ -16,7 +16,7 @@ import { items }      from './data/items.js';
 const PRE_CASTLE_PROFESSOR_IDS = professors.slice(0, -1).map(p => p.id);
 
 // Starting values used by both init() and resetGame().
-const STARTING_REGION = 'outdoor_campus';
+const STARTING_REGION = 'courtyard'; // prototype: change to 'outdoor_campus' for full game
 export const STARTING_HP = 75;
 const STARTING_LEVEL  = 1;
 const STARTING_XP     = 0;
@@ -40,7 +40,7 @@ export function init() {
     activeScene:        'overworld',
     playerHP:           STARTING_HP,
     playerMaxHP:        STARTING_HP,
-    playerPosition:     { ...regions[STARTING_REGION].entryPosition },
+    playerPosition:     { x: 0, y: 0 }, // set from map spawn object by OverworldScene
     currentRegion:      STARTING_REGION,
     defeatedProfessors: [],
     pendingEncounter:   null,
@@ -86,7 +86,7 @@ export function setPlayerPosition(x, y) {
 // entry point (read from data.js).
 export function setRegion(regionId) {
   gameState.currentRegion = regionId;
-  gameState.playerPosition = { ...regions[regionId].entryPosition };
+  // caller (OverworldScene) sets playerPosition via setPlayerPosition after reading targetTile
 }
 
 // Sets the active scene. Expected values: 'overworld' or 'battle'.
@@ -299,7 +299,7 @@ export function addDefenseStat(n) {
 export function resetGame() {
   gameState.activeScene = 'overworld';
   gameState.playerHP = gameState.playerMaxHP;
-  gameState.playerPosition = { ...regions[STARTING_REGION].entryPosition };
+  gameState.playerPosition = { x: 0, y: 0 };
   gameState.currentRegion = STARTING_REGION;
   gameState.pendingEncounter = null;
 }

@@ -5,8 +5,8 @@
 //
 // Keyboard: ↑ ↓ navigate  Enter / Space select  (ESC: no-op at root)
 //
-// Battle Mode opens BattleModeScene (registered as 'OverworldScene') within
-// the same Phaser instance so AudioScene — and music — remain uninterrupted.
+// Battle Mode opens BattleModeScene within the same Phaser instance so
+// AudioScene — and music — remain uninterrupted across the transition.
 // Full Game and Run Tests are separate pages, so music stops on navigation.
 
 import * as engine from '../engine.js';
@@ -46,10 +46,19 @@ export default class MainMenuScene extends Phaser.Scene {
     this._initKeyboard();
   }
 
-  // Called when returning from BattleModeScene — music is already playing.
+  // Called when returning from BattleModeScene or OverworldScene.
   wake() {
     this._cursor = 0;
     this._buildUI();
+    const audio = this.scene.get('AudioScene');
+    if (audio) {
+      const playIntro = () => audio.switchTo('intro_credits');
+      if (audio.tracks && Object.keys(audio.tracks).length > 0) {
+        playIntro();
+      } else {
+        audio.events.once('create', playIntro);
+      }
+    }
   }
 
   _options() {
@@ -57,7 +66,7 @@ export default class MainMenuScene extends Phaser.Scene {
       {
         label:  '▶  Full Game',
         desc:   'Start from the overworld — the complete game loop',
-        action: () => { window.location.href = 'game.html'; },
+        action: () => this._enterFullGame(),
       },
       {
         label:  '⚔  Battle Mode',
@@ -75,7 +84,7 @@ export default class MainMenuScene extends Phaser.Scene {
   _buildUI() {
     this.children.removeAll(true);
 
-    this.add.rectangle(200, 240, 400, 480, 0x1a1a2e);
+    this.add.rectangle(200, 200, 400, 400, 0x1a1a2e);
 
     this.add.text(BTN_X, 110, 'POKEMON PROFESSOR', {
       fontSize: '18px', color: '#ccccff', fontFamily: 'monospace',
@@ -106,7 +115,7 @@ export default class MainMenuScene extends Phaser.Scene {
       bg.on('pointerdown',  opt.action);
     });
 
-    this.add.text(200, 468, '↑ ↓: navigate  Enter: select', {
+    this.add.text(200, 385, '↑ ↓: navigate  Enter: select', {
       fontSize: '10px', color: '#444466', fontFamily: 'monospace',
     }).setOrigin(0.5);
   }
@@ -136,8 +145,13 @@ export default class MainMenuScene extends Phaser.Scene {
     keys.space.on('down', confirm);
   }
 
+  _enterFullGame() {
+    this.scene.sleep('MainMenuScene');
+    this.scene.launch('OverworldScene');
+  }
+
   _enterBattleMode() {
     this.scene.sleep('MainMenuScene');
-    this.scene.launch('OverworldScene', { fromMainMenu: true });
+    this.scene.launch('BattleModeScene', { fromMainMenu: true });
   }
 }

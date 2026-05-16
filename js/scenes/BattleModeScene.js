@@ -1,10 +1,9 @@
 // BattleModeScene.js — battle mode opponent selector
 //
-// Registered under the key 'OverworldScene' so that BattleScene.endBattle()
-// can wake it without modification.
+// Registered under the key 'BattleModeScene'.
 //
 // Header strip (y 0–30): [← Menu]  |  BATTLE MODE
-// Content panel (y 30–480): paginated opponent list
+// Content panel (y 30–400): paginated opponent list
 //
 // Moves/Items configuration is handled by KioskScene (press I).
 // Keyboard: ↑ ↓ navigate  ← → page  Enter battle  ESC back  I menu
@@ -19,11 +18,11 @@ const OPP_BTN_W   = 340;
 const BTN_H       =  34;
 const BTN_Y0      = HEADER_H + 54; // first button centre (y = 84)
 const BTN_GAP     =  44;
-const OPPS_PER_PAGE = 8;
+const OPPS_PER_PAGE = 7;
 
 export default class BattleModeScene extends Phaser.Scene {
   constructor() {
-    super({ key: 'OverworldScene' }); // key must match BattleScene's wake/stop calls
+    super({ key: 'BattleModeScene' });
   }
 
   create(data) {
@@ -62,16 +61,13 @@ export default class BattleModeScene extends Phaser.Scene {
     this._cursor   = 0;
     engine.init();
     const audio = this.scene.get('AudioScene');
-    if (audio) {
-      audio.stop();
-      audio.switchTo('intro_credits');
-    }
+    if (audio) audio.switchTo('intro_credits');
     this._buildUI();
   }
 
   _buildUI() {
     this.children.removeAll(true);
-    this.add.rectangle(200, 240, 400, 480, 0x1a1a2e);
+    this.add.rectangle(200, 200, 400, 400, 0x1a1a2e);
     this._buildHeader();
     this._buildContent();
   }
@@ -130,7 +126,7 @@ export default class BattleModeScene extends Phaser.Scene {
       );
     });
 
-    const PAGE_Y = 448;
+    const PAGE_Y = 375;
     this.add.text(200, PAGE_Y, `${this._studPage + 1} / ${totalPages}`, {
       fontSize: '11px', color: '#8888aa', fontFamily: 'monospace',
     }).setOrigin(0.5);
@@ -144,7 +140,7 @@ export default class BattleModeScene extends Phaser.Scene {
         () => { this._studPage += 1; this._cursor = 0; this._buildUI(); });
     }
 
-    this.add.text(200, 470, '↑ ↓: navigate  ← →: page  Enter: battle  I: menu', {
+    this.add.text(200, 390, '↑ ↓: navigate  ← →: page  Enter: battle  I: menu', {
       fontSize: '9px', color: '#444466', fontFamily: 'monospace',
     }).setOrigin(0.5);
   }
@@ -216,7 +212,7 @@ export default class BattleModeScene extends Phaser.Scene {
 
   _goBack() {
     if (!this._fromMainMenu) return;
-    this.scene.sleep('OverworldScene');
+    this.scene.sleep('BattleModeScene');
     this.scene.wake('MainMenuScene');
   }
 
@@ -269,7 +265,7 @@ export default class BattleModeScene extends Phaser.Scene {
       this.sound.off('unlocked', this._pendingUnlock);
       this._pendingUnlock = null;
     }
-    this.scene.launch('BattleScene', data);
-    this.scene.sleep('OverworldScene');
+    this.scene.launch('BattleScene', { ...data, returnScene: 'BattleModeScene' });
+    this.scene.sleep('BattleModeScene');
   }
 }

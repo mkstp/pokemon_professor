@@ -1,7 +1,7 @@
 # TDD: Game Bootstrap
 
 **File:** `js/main.js`
-**Depends on:** OverworldScene, BattleScene, DialogueScene, AudioScene
+**Depends on:** MainMenuScene, OverworldScene, BattleScene, BattleModeScene, DialogueScene, AudioScene, KioskScene
 
 ---
 
@@ -19,17 +19,19 @@ The configuration object passed to `new Phaser.Game(config)`:
 
 ```js
 {
-  type:   Phaser.AUTO,         // renderer: WebGL if available, Canvas fallback
-  width:  480,                 // canvas width in pixels
-  height: 320,                 // canvas height in pixels
-  backgroundColor: '#000000',  // fill colour shown before first scene renders
-  scene: [                     // scene registry — first entry auto-starts on launch
+  type:            Phaser.AUTO,    // renderer: WebGL if available, Canvas fallback
+  width:           400,            // canvas width in pixels
+  height:          400,            // canvas height in pixels
+  backgroundColor: '#000000',      // fill colour shown before first scene renders
+  pixelArt:        true,           // nearest-neighbour filtering; prevents dark fringe on scaled sprites
+  scene: [                         // scene registry — first entry auto-starts on launch
+    MainMenuScene,                 // ← entry point; all other scenes launched from here
     OverworldScene,
     BattleScene,
+    BattleModeScene,               // opponent selector for jumping straight into any battle
     DialogueScene,
     AudioScene,
-    BattleModeScene,           // debug/dev selector for launching professor or student NPC battles
-    KioskScene,                // unified player menu (moves · items · collection); opened with I key
+    KioskScene,                    // unified player menu (moves · items · collection); opened with I key
   ],
   physics: {
     default: 'arcade',
@@ -37,6 +39,8 @@ The configuration object passed to `new Phaser.Game(config)`:
   },
 }
 ```
+
+`MainMenuScene` auto-starts on launch. All other scenes are inactive until `MainMenuScene` (or a downstream scene) explicitly launches or wakes them. `AudioScene` is launched once by `MainMenuScene.create()` and runs permanently for the lifetime of the game.
 
 ---
 

@@ -34,7 +34,7 @@ export const items = [
     name: 'Triscuit',
     flavourText: 'comes in different flavours',
     category: 'consumable',
-    effect: { action: 'restore_hp', value: 5 },
+    effect: { action: 'restore_hp', value: 50 },
     source: 'npc_clara',
     repeatableSource: true,
   },

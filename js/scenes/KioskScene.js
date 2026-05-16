@@ -3,7 +3,7 @@
 // Four tabs cycled with TAB. Opened with I from the overworld and BattleModeScene.
 // ESC saves all state and exits regardless of which tab is active.
 //
-// Canvas: 400×480 px.
+// Canvas: 400×400 px.
 // Init params: { mode: 'battle' | 'overworld', startTab: 'moves'|'items'|'collection'|'controls', onClose }
 //   battle:    all consumables available (engine.getAllConsumables())
 //   overworld: only consumables the player has collected (filtered via engine.hasItem)
@@ -21,9 +21,9 @@ const ALL_MOVE_MAP = Object.fromEntries(
 // ── Shared layout ─────────────────────────────────────────────────────────────
 
 const CANVAS_W  = 400;
-const CANVAS_H  = 480;
+const CANVAS_H  = 400;
 const TAB_BAR_H = 28;
-const FOOTER_Y  = 468;
+const FOOTER_Y  = 388;
 
 // Four equal tabs across the full width
 const TAB_W      = Math.floor(CANVAS_W / 4); // 100
@@ -151,6 +151,9 @@ export default class KioskScene extends Phaser.Scene {
 
     this._setTab(this.startTab);
 
+    this._confirmActive = false;
+    this._confirmChoice = 1; // 0=YES 1=NO; default NO (safer)
+
     // Keyboard
     const keys = this.input.keyboard.addKeys({
       up:    Phaser.Input.Keyboard.KeyCodes.UP,
@@ -162,17 +165,33 @@ export default class KioskScene extends Phaser.Scene {
       esc:   Phaser.Input.Keyboard.KeyCodes.ESC,
       tab:   Phaser.Input.Keyboard.KeyCodes.TAB,
       i:     Phaser.Input.Keyboard.KeyCodes.I,
+      r:     Phaser.Input.Keyboard.KeyCodes.R,
     });
 
     keys.up.on('down',    () => this._onUp());
     keys.down.on('down',  () => this._onDown());
     keys.left.on('down',  () => this._onLeft());
     keys.right.on('down', () => this._onRight());
-    keys.enter.on('down', () => this._onConfirm());
-    keys.space.on('down', () => this._onConfirm());
-    keys.esc.on('down',   () => this._confirmAndExit());
-    keys.tab.on('down',   () => this._cycleTab());
-    keys.i.on('down',     () => this._confirmAndExit());
+    keys.enter.on('down', () => {
+      if (this._confirmActive) { this._onConfirmChoice(); return; }
+      this._onConfirm();
+    });
+    keys.space.on('down', () => {
+      if (this._confirmActive) { this._onConfirmChoice(); return; }
+      this._onConfirm();
+    });
+    keys.esc.on('down', () => {
+      if (this._confirmActive) { this._hideReturnConfirm(); return; }
+      this._confirmAndExit();
+    });
+    keys.tab.on('down', () => { if (!this._confirmActive) this._cycleTab(); });
+    keys.i.on('down',   () => { if (!this._confirmActive) this._confirmAndExit(); });
+
+    if (this.mode === 'overworld') {
+      keys.r.on('down', () => this._showReturnConfirm());
+    }
+
+    if (this.mode === 'overworld') this._buildConfirmDialog();
   }
 
   // ── Shared structure ──────────────────────────────────────────────────────────
@@ -256,6 +275,7 @@ export default class KioskScene extends Phaser.Scene {
   // ── Input routing ─────────────────────────────────────────────────────────────
 
   _onUp() {
+    if (this._confirmActive) return;
     if (this.activeTab === 'moves')           this._moveMovesCursor(-1);
     else if (this.activeTab === 'items')      this._moveItemsCursor(-1);
     else if (this.activeTab === 'collection') {
@@ -265,6 +285,7 @@ export default class KioskScene extends Phaser.Scene {
   }
 
   _onDown() {
+    if (this._confirmActive) return;
     if (this.activeTab === 'moves')           this._moveMovesCursor(1);
     else if (this.activeTab === 'items')      this._moveItemsCursor(1);
     else if (this.activeTab === 'collection') {
@@ -274,6 +295,7 @@ export default class KioskScene extends Phaser.Scene {
   }
 
   _onLeft() {
+    if (this._confirmActive) { this._confirmChoice = 0; this._refreshConfirm(); return; }
     if (this.activeTab === 'collection') {
       this.collCursor = Math.max(0, this.collCursor - 1);
       this._refreshCollection();
@@ -281,6 +303,7 @@ export default class KioskScene extends Phaser.Scene {
   }
 
   _onRight() {
+    if (this._confirmActive) { this._confirmChoice = 1; this._refreshConfirm(); return; }
     if (this.activeTab === 'collection') {
       this.collCursor = Math.min(COLLECTIBLE_IDS.length - 1, this.collCursor + 1);
       this._refreshCollection();
@@ -679,5 +702,78 @@ export default class KioskScene extends Phaser.Scene {
     row(230, 'Enter / Space',   'Confirm');
     row(244, 'ESC',             'Back (shortcut)');
     row(258, 'Back (menu item)', 'Return to actions');
+
+    if (this.mode === 'overworld') {
+      const div = t(this.add.graphics());
+      div.lineStyle(1, 0x998877, 0.5);
+      div.lineBetween(10, 276, 390, 276);
+      hdr(284, 'GAME');
+      row(300, 'R',              'Return to title screen');
+    }
+  }
+
+  // ── Return-to-title confirm dialog (overworld mode only) ──────────────────────
+
+  _buildConfirmDialog() {
+    const depth = 20;
+    this._confirmObjs = [];
+    const push = obj => { this._confirmObjs.push(obj); obj.setDepth(depth); return obj; };
+
+    push(this.add.rectangle(200, 200, 400, 400, 0x000000, 0.65));
+    push(this.add.rectangle(200, 182, 300, 120, 0xf0e8d0));
+
+    const border = this.add.graphics().setDepth(depth);
+    this._confirmObjs.push(border);
+    border.lineStyle(2, 0x443300, 1);
+    border.strokeRect(50, 122, 300, 120);
+
+    push(this.add.text(200, 145, 'Return to title?', {
+      fontSize: '13px', fill: '#222222', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5));
+    push(this.add.text(200, 168, 'Progress will be lost.', {
+      fontSize: '10px', fill: '#664444', fontFamily: 'monospace',
+    }).setOrigin(0.5));
+
+    this._confirmYesTxt = push(this.add.text(120, 210, '[ YES ]', {
+      fontSize: '12px', fontFamily: 'monospace',
+    }).setOrigin(0.5));
+    this._confirmNoTxt = push(this.add.text(280, 210, '[  NO  ]', {
+      fontSize: '12px', fontFamily: 'monospace',
+    }).setOrigin(0.5));
+
+    push(this.add.text(200, 232, '← / →: choose   Enter: confirm   ESC: cancel', {
+      fontSize: '8px', fill: '#998877', fontFamily: 'monospace',
+    }).setOrigin(0.5));
+
+    this._confirmObjs.forEach(o => o.setVisible(false));
+  }
+
+  _showReturnConfirm() {
+    this._confirmActive = true;
+    this._confirmChoice = 1;
+    this._refreshConfirm();
+    this._confirmObjs.forEach(o => o.setVisible(true));
+  }
+
+  _hideReturnConfirm() {
+    this._confirmActive = false;
+    this._confirmObjs.forEach(o => o.setVisible(false));
+  }
+
+  _refreshConfirm() {
+    this._confirmYesTxt.setStyle({ fill: this._confirmChoice === 0 ? '#cc2222' : '#998877' });
+    this._confirmNoTxt.setStyle({ fill: this._confirmChoice === 1 ? '#226622' : '#998877' });
+  }
+
+  _onConfirmChoice() {
+    if (this._confirmChoice === 0) {
+      this._executeReturnToTitle();
+    } else {
+      this._hideReturnConfirm();
+    }
+  }
+
+  _executeReturnToTitle() {
+    window.location.reload();
   }
 }

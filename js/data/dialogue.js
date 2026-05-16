@@ -309,6 +309,15 @@ export const dialogueSequences = {
     { speaker: 'Suzanna', line: 'That kind of listening stays with you.' },
   ],
 
+  // ── Tutorial (courtyard guide) ────────────────────────────────────────────
+  'npc_courtyard_guide': [
+    { speaker: 'A Passing Student', line: 'Oh — you must be new here. Fair warning: this place is not quite what the brochure suggested.' },
+    { speaker: 'A Passing Student', line: 'Seven professors stand between you and your credits. You\'ll need to defeat each one to pass their class.' },
+    { speaker: 'A Passing Student', line: 'Arrow keys to move. Space to interact with people. Press I to manage your moves and items.' },
+    { speaker: 'A Passing Student', line: 'Schwaartz is usually around the campus. She\'s a reasonable place to start.' },
+    { speaker: 'A Passing Student', line: 'Good luck. You\'ll probably need it.' },
+  ],
+
   // ── Ambient NPCs ─────────────────────────────────────────────────────────
   'npc_casey': [
     { speaker: 'Casey', line: 'You\'ve tried enough. You get it.' },

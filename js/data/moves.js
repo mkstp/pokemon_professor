@@ -123,7 +123,7 @@ export const professorMoves = [
   {
     id: 'big_o',
     name: 'Big O',
-    damage: 10,
+    damage: 20,
     description: 'More taunt than attack. 50% chance to stun the student, skipping their next move.',
     effect: 'chance_skip_opponent',
     skipChance: 0.5,
@@ -483,7 +483,7 @@ export const npcMoves = [
     id: 'access_denied',
     name: 'Access Denied',
     damage: 0,
-    description: 'Rules are rules. Opponent skips their next turn.',
+    description: 'Rules are rules. Chance for opponent to skip their next turn.',
     effect: 'chance_skip_opponent',
   },
   {
