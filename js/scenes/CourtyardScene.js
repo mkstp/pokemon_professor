@@ -230,10 +230,9 @@ export default class CourtyardScene extends Phaser.Scene {
     if (this._talkPrompt) this._talkPrompt.setVisible(false);
     this.input.keyboard.enabled = false;
 
-    // Parsemore only battles once every other professor is defeated.
-    if (professorId === 'prof_parsemore' && !engine.allProfessorsDefeated()) {
+    if (prof.disguise && !engine.allProfessorsDefeated()) {
       this.scene.launch('DialogueScene', {
-        sequenceKey: 'npc_courtyard_guide',
+        sequenceKey: prof.disguise.dialogue,
         onComplete:  () => {
           this._inEncounter = false;
           this.input.keyboard.enabled = true;

@@ -79,6 +79,11 @@ export const dialogueSequences = {
   'prof_parsemore_loss': [
     { speaker: 'Prof. Parsemore', line: 'As expected. The data doesn\'t lie.' },
   ],
+  'parsemore_disguised': [
+    { speaker: 'A Passing Student', line: 'Oh — you\'re just starting out? I\'ve been watching the cohort come through here all semester.' },
+    { speaker: 'A Passing Student', line: 'Five of them are still out there. Don\'t skip any — the structure matters more than you think.' },
+    { speaker: 'A Passing Student', line: 'Come back when you\'ve worked through all of it. You\'ll see things differently by then.' },
+  ],
 
   // ── Prof. Vec Tor ─────────────────────────────────────────────────────────
   'prof_vec_tor_pre': [

@@ -167,6 +167,10 @@ export const professors = [
       postWin:   'prof_parsemore_win',
       postLoss:  'prof_parsemore_loss',
     },
+    disguise: {
+      displayName: 'A Passing Student',
+      dialogue:    'parsemore_disguised',
+    },
     overworldSprite: 'assets/sprites/character_overworld_sprites/NPC 66.png',
     sprite:  'assets/sprites/battle/parsemore_l1.png',
     sprites: [
