@@ -134,7 +134,7 @@ player: {
 
 ## Asset Loading
 
-Sprites are loaded by the Phaser scenes that use them, via `this.load.image()` and `this.load.spritesheet()` in each scene's `preload()` method. `OverworldScene` loads overworld spritesheets; `BattleScene` loads battle sprites. Phaser caches loaded textures globally — an asset loaded by one scene is available to all subsequent scenes without reloading.
+Sprites are loaded by the Phaser scenes that use them, via `this.load.image()` and `this.load.spritesheet()` in each scene's `preload()` method. `CourtyardScene` loads overworld spritesheets; `BattleScene` loads battle sprites. Phaser caches loaded textures globally — an asset loaded by one scene is available to all subsequent scenes without reloading.
 
 Sprite paths in `data.js` (`professor.sprites.battle`, `professor.sprites.overworld`) serve as the texture keys passed to `this.load` calls. If a texture key is not found at render time, Phaser renders a default missing-texture indicator — this makes missing assets immediately visible during development.
 

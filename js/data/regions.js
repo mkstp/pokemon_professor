@@ -2,7 +2,7 @@
 //
 // Spatial data (spawn points, encounter zones, transition zones, NPC positions)
 // lives in each region's TMJ file (assets/maps/<id>.tmj) via the Objects layer.
-// This file covers only the metadata OverworldScene needs before a map loads.
+// This file covers only the metadata CourtyardScene needs before a map loads.
 'use strict';
 
 export const regions = {
@@ -60,7 +60,7 @@ export const regions = {
     displayName: 'The Courtyard',
     mapFile: 'assets/maps/courtyard.tmj',
     weatherEffect: 'mist',
-    music: 'indoor',
+    music: 'overworld',
   },
 
   castle: {

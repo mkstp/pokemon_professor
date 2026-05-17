@@ -20,9 +20,9 @@ The data layer is split into domain files for LLM-context efficiency. Each file 
 | `professors.js` | `professors` | `BattleScene`, `BattleModeScene`, `engine` |
 | `moves.js` | `playerMoves`, `professorMoves`, `npcMoves` | `BattleScene`, `KioskScene`, `engine` |
 | `students.js` | `studentNPCs` | `BattleScene`, `BattleModeScene` |
-| `ambientNpcs.js` | `ambientNPCs` | `OverworldScene` |
+| `ambientNpcs.js` | `ambientNPCs` | `CourtyardScene` |
 | `items.js` | `items` | `BattleScene`, `engine`, overworld item interactions |
-| `regions.js` | `TILE`, `regions` | `engine`, `OverworldScene` |
+| `regions.js` | `TILE`, `regions` | `engine`, `CourtyardScene` |
 | `dialogue.js` | `dialogueSequences` | `DialogueScene` |
 | `audio.js` | `audioTracks` | `AudioScene` |
 
@@ -237,7 +237,7 @@ TILE = {
 
 **Exposes to:**
 - `engine` — `regions`, `professors`
-- `OverworldScene` — `regions`, `ambientNPCs`
+- `CourtyardScene` — `regions`, `ambientNPCs`
 - `BattleScene` — `professors`, `professorMoves`, `playerMoves`, `studentNPCs`, `npcMoves`, `items`
 - `DialogueScene` — `dialogueSequences`
 - `AudioScene` — `audioTracks`

@@ -1,7 +1,7 @@
 # TDD: Game Bootstrap
 
 **File:** `js/main.js`
-**Depends on:** MainMenuScene, OverworldScene, BattleScene, BattleModeScene, DialogueScene, AudioScene, KioskScene
+**Depends on:** MainMenuScene, CourtyardScene, BattleScene, BattleModeScene, DialogueScene, AudioScene, KioskScene
 
 ---
 
@@ -26,7 +26,7 @@ The configuration object passed to `new Phaser.Game(config)`:
   pixelArt:        true,           // nearest-neighbour filtering; prevents dark fringe on scaled sprites
   scene: [                         // scene registry — first entry auto-starts on launch
     MainMenuScene,                 // ← entry point; all other scenes launched from here
-    OverworldScene,
+    CourtyardScene,
     BattleScene,
     BattleModeScene,               // opponent selector for jumping straight into any battle
     DialogueScene,

@@ -1,10 +1,10 @@
 // BattleScene.js — turn-based battle scene
 //
-// Receives opponent data from OverworldScene via scene init data:
+// Receives opponent data from the calling scene via scene init data:
 //   { opponentType: 'professor', professorId } — professor battle
 //   { opponentType: 'student',   studentId   } — student NPC battle (debug mode)
 // Builds all battle UI as Phaser GameObjects, handles keyboard input, and resolves
-// move interactions each turn. Returns control to OverworldScene on battle end.
+// move interactions each turn. Returns control to the calling scene on battle end.
 //
 // Canvas: 400×400 px (defined in game.js config; debug.html uses 400×900).
 // Depends on: engine.js (state reads/writes), data/professors.js,
@@ -90,13 +90,13 @@ export default class BattleScene extends Phaser.Scene {
     super({ key: 'BattleScene' });
   }
 
-  // Receives opponent data from OverworldScene.
-  // opponentType defaults to 'professor' for backward compatibility with OverworldScene.
+  // opponentType defaults to 'professor' for backward compatibility.
   // opponentId resolves from either professorId or studentId, whichever is present.
+  // returnScene must wire up this.events.on('wake', this.wake, this) in its create().
   init(data) {
     this.opponentType = data.opponentType ?? 'professor';
     this.opponentId   = data.professorId  ?? data.studentId;
-    this.returnScene  = data.returnScene  ?? 'OverworldScene';
+    this.returnScene  = data.returnScene  ?? 'CourtyardScene';
   }
 
   // Loads battle sprites. Skips the load if Phaser already cached the texture.
@@ -510,33 +510,30 @@ export default class BattleScene extends Phaser.Scene {
     this.battleState.phase   = 'end';
   }
 
-  // Stops the battle scene and returns control to OverworldScene.
-  // For a win, launches DialogueScene with the post-battle sequence first.
+  // Stops the battle scene and returns control to the calling scene.
+  // The caller's wake() is responsible for restarting music and re-enabling controls.
   endBattle() {
     this.battleState.phase = 'done'; // prevent re-entry from update()
 
     const audio = this.scene.get('AudioScene');
+    const { outcome } = this.battleState;
 
-    if (this.battleState.outcome === 'win' && this.opponentType === 'professor') {
-      // Professor win: play post-battle dialogue, then return to caller.
-      // Only switch to overworld music when returning to OverworldScene;
-      // if returning to BattleModeScene, let its wake() handle audio.
-      const sequenceKey = this.battleState.professor.dialogue.postWin;
-      this.scene.launch('DialogueScene', {
-        sequenceKey,
-        onComplete: () => {
-          if (this.returnScene === 'OverworldScene') audio.switchTo('overworld');
-          else audio.stop();
-          this.scene.stop('BattleScene');
-          this.scene.wake(this.returnScene);
-        },
-      });
-    } else {
-      // All other outcomes: stop music and return to caller.
-      // The receiving scene's wake() is responsible for starting its own track.
+    const returnToCaller = () => {
       audio.stop();
-      this.scene.stop('BattleScene');
       this.scene.wake(this.returnScene);
+      this.scene.stop('BattleScene');
+    };
+
+    if (outcome === 'win' && this.opponentType === 'professor') {
+      // Professor win: post-battle dialogue, then return to caller.
+      const sequenceKey = this.battleState.professor.dialogue.postWin;
+      this.scene.launch('DialogueScene', { sequenceKey, onComplete: returnToCaller });
+    } else if (outcome === 'win' || outcome === 'fled') {
+      // Student win or flee (either opponent): return to caller.
+      returnToCaller();
+    } else {
+      // Loss: return to caller.
+      returnToCaller();
     }
   }
 

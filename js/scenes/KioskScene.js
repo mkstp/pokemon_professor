@@ -1,6 +1,6 @@
 // KioskScene.js — unified player menu (moves · items · collection · controls)
 //
-// Four tabs cycled with TAB. Opened with I from the overworld and BattleModeScene.
+// Four tabs cycled with ← →. Opened with I from the overworld and BattleModeScene.
 // ESC saves all state and exits regardless of which tab is active.
 //
 // Canvas: 400×400 px.
@@ -163,7 +163,6 @@ export default class KioskScene extends Phaser.Scene {
       enter: Phaser.Input.Keyboard.KeyCodes.ENTER,
       space: Phaser.Input.Keyboard.KeyCodes.SPACE,
       esc:   Phaser.Input.Keyboard.KeyCodes.ESC,
-      tab:   Phaser.Input.Keyboard.KeyCodes.TAB,
       i:     Phaser.Input.Keyboard.KeyCodes.I,
       r:     Phaser.Input.Keyboard.KeyCodes.R,
     });
@@ -184,7 +183,6 @@ export default class KioskScene extends Phaser.Scene {
       if (this._confirmActive) { this._hideReturnConfirm(); return; }
       this._confirmAndExit();
     });
-    keys.tab.on('down', () => { if (!this._confirmActive) this._cycleTab(); });
     keys.i.on('down',   () => { if (!this._confirmActive) this._confirmAndExit(); });
 
     if (this.mode === 'overworld') {
@@ -240,11 +238,11 @@ export default class KioskScene extends Phaser.Scene {
   _updateFooter() {
     if (this._movesFullWarning || this._itemsFullWarning) return;
     if (this.activeTab === 'collection') {
-      this.footerText.setText('← →: browse  ↑ ↓: row  TAB: next  I/ESC: exit').setStyle({ fill: '#222222' });
+      this.footerText.setText('← →: next tab  ↑ ↓: row  I/ESC: exit').setStyle({ fill: '#222222' });
     } else if (this.activeTab === 'controls') {
-      this.footerText.setText('TAB: next tab  I/ESC: exit').setStyle({ fill: '#222222' });
+      this.footerText.setText('← →: next tab  I/ESC: exit').setStyle({ fill: '#222222' });
     } else {
-      this.footerText.setText('ENTER: toggle  TAB: next  I/ESC: save & exit').setStyle({ fill: '#222222' });
+      this.footerText.setText('ENTER: toggle  ← →: next tab  I/ESC: save & exit').setStyle({ fill: '#222222' });
     }
   }
 
@@ -267,9 +265,9 @@ export default class KioskScene extends Phaser.Scene {
     this._updateFooter();
   }
 
-  _cycleTab() {
+  _cycleTab(dir = 1) {
     const idx = TAB_KEYS.indexOf(this.activeTab);
-    this._setTab(TAB_KEYS[(idx + 1) % TAB_KEYS.length]);
+    this._setTab(TAB_KEYS[(idx + dir + TAB_KEYS.length) % TAB_KEYS.length]);
   }
 
   // ── Input routing ─────────────────────────────────────────────────────────────
@@ -279,7 +277,7 @@ export default class KioskScene extends Phaser.Scene {
     if (this.activeTab === 'moves')           this._moveMovesCursor(-1);
     else if (this.activeTab === 'items')      this._moveItemsCursor(-1);
     else if (this.activeTab === 'collection') {
-      this.collCursor = Math.max(0, this.collCursor - 5);
+      this.collCursor = Math.max(0, this.collCursor - 1);
       this._refreshCollection();
     }
   }
@@ -289,25 +287,19 @@ export default class KioskScene extends Phaser.Scene {
     if (this.activeTab === 'moves')           this._moveMovesCursor(1);
     else if (this.activeTab === 'items')      this._moveItemsCursor(1);
     else if (this.activeTab === 'collection') {
-      this.collCursor = Math.min(COLLECTIBLE_IDS.length - 1, this.collCursor + 5);
+      this.collCursor = Math.min(COLLECTIBLE_IDS.length - 1, this.collCursor + 1);
       this._refreshCollection();
     }
   }
 
   _onLeft() {
     if (this._confirmActive) { this._confirmChoice = 0; this._refreshConfirm(); return; }
-    if (this.activeTab === 'collection') {
-      this.collCursor = Math.max(0, this.collCursor - 1);
-      this._refreshCollection();
-    }
+    this._cycleTab(-1);
   }
 
   _onRight() {
     if (this._confirmActive) { this._confirmChoice = 1; this._refreshConfirm(); return; }
-    if (this.activeTab === 'collection') {
-      this.collCursor = Math.min(COLLECTIBLE_IDS.length - 1, this.collCursor + 1);
-      this._refreshCollection();
-    }
+    this._cycleTab(1);
   }
 
   _onConfirm() {
@@ -691,11 +683,10 @@ export default class KioskScene extends Phaser.Scene {
     row( 84, 'I',               'Open menu');
 
     hdr(106, 'MENU');
-    row(122, 'Tab',             'Next tab (wraps)');
+    row(122, '← →',            'Next / prev tab');
     row(136, '↑ ↓',            'Navigate list');
-    row(150, '← → (collection)', 'Browse grid');
-    row(164, 'Enter / Space',   'Select or toggle');
-    row(178, 'I or ESC',        'Save and exit');
+    row(150, 'Enter / Space',   'Select or toggle');
+    row(164, 'I or ESC',        'Save and exit');
 
     hdr(200, 'BATTLE');
     row(216, '↑ ↓',            'Navigate menus');

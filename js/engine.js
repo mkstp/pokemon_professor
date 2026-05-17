@@ -40,7 +40,7 @@ export function init() {
     activeScene:        'overworld',
     playerHP:           STARTING_HP,
     playerMaxHP:        STARTING_HP,
-    playerPosition:     { x: 0, y: 0 }, // set from map spawn object by OverworldScene
+    playerPosition:     { x: 0, y: 0 }, // set from map spawn object by CourtyardScene
     currentRegion:      STARTING_REGION,
     defeatedProfessors: [],
     pendingEncounter:   null,
@@ -86,7 +86,7 @@ export function setPlayerPosition(x, y) {
 // entry point (read from data.js).
 export function setRegion(regionId) {
   gameState.currentRegion = regionId;
-  // caller (OverworldScene) sets playerPosition via setPlayerPosition after reading targetTile
+  // caller (CourtyardScene) sets playerPosition via setPlayerPosition after reading targetTile
 }
 
 // Sets the active scene. Expected values: 'overworld' or 'battle'.

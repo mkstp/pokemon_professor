@@ -7,7 +7,7 @@
 
 ## Responsibility
 
-Owns the turn-based battle loop: move selection, damage resolution, and HP management. Renders all battle UI as Phaser GameObjects. Returns control to `OverworldScene` when the battle ends. Does not manage dialogue — `OverworldScene` launches `DialogueScene` before the battle; `BattleScene` launches it after.
+Owns the turn-based battle loop: move selection, damage resolution, and HP management. Renders all battle UI as Phaser GameObjects. Returns control to `CourtyardScene` when the battle ends. Does not manage dialogue — `CourtyardScene` launches `DialogueScene` before the battle; `BattleScene` launches it after.
 
 Battle turn logic (damage application, move effects) is extracted into `js/scenes/battle/resolver.js`. `BattleScene` handles all Phaser rendering, input, and scene lifecycle; `resolver.js` handles pure game-logic functions with no Phaser dependency. This boundary keeps `BattleScene` navigable as UI code.
 
@@ -81,7 +81,7 @@ Set on the `BattleScene` instance via `init(data)`. Controls which move map and 
 ### init(data)
 
 - **Does:** Receives scene launch data and stores the professor id for use in `create()`.
-- **Inputs:** `data` — object: `{ professorId: string }`, passed by `OverworldScene` via `this.scene.start('BattleScene', data)`.
+- **Inputs:** `data` — object: `{ professorId: string }`, passed by `CourtyardScene` via `this.scene.start('BattleScene', data)`.
 - **Returns:** void
 - **Side effects:** Stores `data.professorId` as a scene-level variable.
 
@@ -145,9 +145,9 @@ Set on the `BattleScene` instance via `init(data)`. Controls which move map and 
 
 ### endBattle()
 
-- **Does:** Stops the battle scene and returns control to `OverworldScene`.
+- **Does:** Stops the battle scene and returns control to `CourtyardScene`.
 - **Returns:** void
-- **Side effects:** If outcome is `'win'`, launches `DialogueScene` with the post-battle sequence key and waits for it to complete before waking the overworld. Calls `this.scene.get('AudioScene').switchTo('overworld')`. Stops this scene and wakes `OverworldScene` via `this.scene.wake('OverworldScene')`.
+- **Side effects:** If outcome is `'win'`, launches `DialogueScene` with the post-battle sequence key and waits for it to complete before waking the overworld. Calls `this.scene.get('AudioScene').switchTo('overworld')`. Stops this scene and wakes `CourtyardScene` via `this.scene.wake('CourtyardScene')`.
 
 ---
 
@@ -207,6 +207,6 @@ A parallel set of effects controls the student NPC battle system. Effects marked
 
 **Exposes to:**
 - `main.js` — registered as `'BattleScene'`
-- `OverworldScene` — started via `this.scene.start('BattleScene', { professorId })`; returns by waking `OverworldScene` when the battle ends
+- `CourtyardScene` — started via `this.scene.start('BattleScene', { professorId })`; returns by waking `CourtyardScene` when the battle ends
 - `AudioScene` — accessed via `this.scene.get('AudioScene').switchTo(trackId)`
 - `DialogueScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })` for post-battle dialogue

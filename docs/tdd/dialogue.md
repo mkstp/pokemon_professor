@@ -68,4 +68,4 @@ Module-level object:
 
 **Exposes to:**
 - `main.js` — registered as `'DialogueScene'`
-- `OverworldScene` and `BattleScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })`; both scenes listen for the `onComplete` event to resume their logic after the sequence finishes
+- `CourtyardScene` and `BattleScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })`; both scenes listen for the `onComplete` event to resume their logic after the sequence finishes

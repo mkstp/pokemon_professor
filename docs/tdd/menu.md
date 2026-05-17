@@ -25,7 +25,7 @@ Entry point for the game. Auto-started by Phaser on launch (first in the scene r
 
 ### wake()
 
-Called by Phaser when `MainMenuScene` is woken after sleeping (i.e. on return from `OverworldScene` or `BattleModeScene`). Must restore the menu to a clean, interactive state.
+Called by Phaser when `MainMenuScene` is woken after sleeping (i.e. on return from `CourtyardScene` or `BattleModeScene`). Must restore the menu to a clean, interactive state.
 
 - **Does:** Resets cursor to 0, rebuilds UI, switches audio to `intro_credits`.
 - **Returns:** void
@@ -55,9 +55,9 @@ Three options rendered as interactive buttons, navigable by keyboard (↑ ↓ / 
 
 ### _enterFullGame()
 
-- **Does:** Puts `MainMenuScene` to sleep and launches `OverworldScene`.
-- **Side effects:** `this.scene.sleep('MainMenuScene')`, `this.scene.launch('OverworldScene')`.
-- **Audio:** No explicit audio call. `OverworldScene.create()` calls `audio.switchTo('overworld')`.
+- **Does:** Puts `MainMenuScene` to sleep and launches `CourtyardScene`.
+- **Side effects:** `this.scene.sleep('MainMenuScene')`, `this.scene.launch('CourtyardScene')`.
+- **Audio:** No explicit audio call. `CourtyardScene.create()` calls `audio.switchTo('overworld')`.
 
 ### _enterBattleMode()
 
@@ -81,9 +81,9 @@ Three options rendered as interactive buttons, navigable by keyboard (↑ ↓ / 
 
 | Trigger | This scene | Target scene |
 |---------|-----------|--------------|
-| Full Game selected | `sleep('MainMenuScene')` | `launch('OverworldScene')` |
+| Full Game selected | `sleep('MainMenuScene')` | `launch('CourtyardScene')` |
 | Battle Mode selected | `sleep('MainMenuScene')` | `launch('BattleModeScene', { fromMainMenu: true })` |
-| Return from OverworldScene (via KioskScene) | `wake('MainMenuScene')` called by `KioskScene._executeReturnToTitle()` | — |
+| Return from CourtyardScene (via KioskScene) | `wake('MainMenuScene')` called by `KioskScene._executeReturnToTitle()` | — |
 | Return from BattleModeScene | `wake('MainMenuScene')` called by `BattleModeScene._goBack()` | — |
 
 `MainMenuScene` is always slept (not stopped) so that `wake()` can be used for cheap re-entry without re-running `preload()` or re-registering keyboard listeners.

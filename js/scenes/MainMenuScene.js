@@ -46,7 +46,7 @@ export default class MainMenuScene extends Phaser.Scene {
     this._initKeyboard();
   }
 
-  // Called when returning from BattleModeScene or OverworldScene.
+  // Called when returning from BattleModeScene or CourtyardScene.
   wake() {
     this._cursor = 0;
     this._buildUI();
@@ -147,7 +147,7 @@ export default class MainMenuScene extends Phaser.Scene {
 
   _enterFullGame() {
     this.scene.sleep('MainMenuScene');
-    this.scene.launch('OverworldScene');
+    this.scene.launch('CourtyardScene');
   }
 
   _enterBattleMode() {

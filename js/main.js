@@ -3,7 +3,7 @@
 // Creates the Phaser.Game instance and registers all scenes. No game logic
 // lives here — all behaviour is in the scene files.
 
-import OverworldScene    from './scenes/OverworldScene.js';
+import CourtyardScene    from './scenes/CourtyardScene.js';
 import BattleScene       from './scenes/BattleScene.js';
 import BattleModeScene   from './scenes/BattleModeScene.js';
 import DialogueScene     from './scenes/DialogueScene.js';
@@ -24,7 +24,7 @@ const config = {
   scene: [
     // MainMenuScene auto-starts first; all other scenes are launched from there.
     MainMenuScene,
-    OverworldScene,
+    CourtyardScene,
     BattleScene,
     BattleModeScene,
     DialogueScene,

@@ -100,5 +100,5 @@ Module-level string: the id of the track currently playing, or `null` if nothing
 - `data` — `audioTracks` array for track ids, file paths, and loop settings
 
 **Exposes to:**
-- `main.js` — registered as `'AudioScene'`; started alongside `OverworldScene` on game launch
-- `OverworldScene`, `BattleScene` — call `this.scene.get('AudioScene').switchTo(trackId)` on scene create and transitions; call `.play('victory')` or `.play('defeat')` on battle resolution
+- `main.js` — registered as `'AudioScene'`; started alongside `CourtyardScene` on game launch
+- `CourtyardScene`, `BattleScene` — call `this.scene.get('AudioScene').switchTo(trackId)` on scene create and transitions; call `.play('victory')` or `.play('defeat')` on battle resolution

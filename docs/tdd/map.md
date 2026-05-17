@@ -1,6 +1,6 @@
 # TDD: Overworld Scene
 
-**File:** `js/scenes/OverworldScene.js`
+**File:** `js/scenes/CourtyardScene.js`
 **Depends on:** engine, data, visuals
 
 ---
@@ -109,6 +109,8 @@ The following arrays are populated in `create()` from the Objects layer and used
   - Binds cursor keys via `this.input.keyboard.createCursorKeys()`.
   - Calls `visuals.createWeather(this, region.weatherEffect)` if applicable.
   - Calls `this.scene.get('AudioScene').switchTo(region.music)`.
+  - Sets `this._transitioning = false`.
+  - Fades the camera in from black: `this.cameras.main.fadeIn(300, 0, 0, 0)`.
 
 ---
 
@@ -120,6 +122,7 @@ The following arrays are populated in `create()` from the Objects layer and used
 - **Side effects:**
   - On directional key press (debounced — one tile per keydown): plays the walk animation for that direction; tweens the player sprite 16px in that direction. Phaser Arcade Physics prevents movement into `worldLayer` collision tiles — no manual walkability check is needed.
   - On tween complete: snaps to the tile centre; plays idle frame; updates `engine.setPlayerPosition(x, y)` in tile coordinates; calls `checkEncounterTrigger()` and `checkRegionTransition()`.
+  - If `this._transitioning` is true, skips all input processing and returns early.
 
 ---
 
@@ -135,7 +138,10 @@ The following arrays are populated in `create()` from the Objects layer and used
 
 - **Does:** Tests whether the player's current world position overlaps any transition zone.
 - **Returns:** void
-- **Side effects:** Iterates `this.transitionZones`. For a matching zone whose conditions are satisfied (`requiresAllDefeated`, `requiresItem`), calls `engine.setRegion(targetRegion)` and `engine.setPlayerPosition(targetTileX, targetTileY)`, then restarts the scene.
+- **Side effects:** Iterates `this.transitionZones`. For a matching zone whose conditions are satisfied (`requiresAllDefeated`, `requiresItem`):
+  1. Sets `this._transitioning = true` to lock input and prevent re-entry.
+  2. Calls `this.cameras.main.fadeOut(300, 0, 0, 0)`.
+  3. Listens once for `'camerafadeoutcomplete'` on `this.cameras.main`: in that handler, calls `engine.setRegion(targetRegion)` and `engine.setPlayerPosition(targetTileX, targetTileY)`, then calls `this.scene.restart()`.
 
 ---
 
@@ -161,7 +167,7 @@ The player menu (`KioskScene`) is accessible at any time in the overworld by pre
 - `visuals` — `createWeather(scene, weatherType)`
 
 **Exposes to:**
-- `main.js` — registered as `'OverworldScene'`; started on game launch
+- `main.js` — registered as `'CourtyardScene'`; started on game launch
 - `BattleScene` — started via `this.scene.start('BattleScene', { professorId })` after pre-battle dialogue
 - `DialogueScene` — launched via `this.scene.launch('DialogueScene', { sequenceKey, onComplete })`
 - `KioskScene` — launched as overlay on `I` keypress
